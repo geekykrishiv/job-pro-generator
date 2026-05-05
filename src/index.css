@@ -100,6 +100,20 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+
+  .font-serif {
+    font-family: 'Georgia', 'Times New Roman', serif;
   }
 }
+
+.latex-preview {
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+.latex-preview h1, .latex-preview h2, .latex-preview h3 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+}
+.latex-preview p { margin-bottom: 0.6em; }
