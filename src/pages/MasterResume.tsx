@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { MasterResume, Education, Experience, ProjectItem } from "@/types";
+import type { MasterResume, Education, Experience, ProjectItem, Certification, Achievement } from "@/types";
 
 const empty: MasterResume = {
   fullName: "",
@@ -21,6 +21,8 @@ const empty: MasterResume = {
   experience: [],
   projects: [],
   skills: [],
+  certifications: [],
+  achievements: [],
 };
 
 const uid = () => crypto.randomUUID();
