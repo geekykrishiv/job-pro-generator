@@ -27,6 +27,20 @@ export interface ProjectItem {
   description: string;
 }
 
+export interface Certification {
+  id: string;
+  name: string;
+  issuer?: string;
+  date?: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description?: string;
+  date?: string;
+}
+
 export interface MasterResume {
   fullName: string;
   email: string;
@@ -38,6 +52,8 @@ export interface MasterResume {
   experience: Experience[];
   projects: ProjectItem[];
   skills: string[];
+  certifications?: Certification[];
+  achievements?: Achievement[];
 }
 
 export interface ChatMessage {
