@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { MasterResume, Education, Experience, ProjectItem } from "@/types";
+import type { MasterResume, Education, Experience, ProjectItem, Certification, Achievement } from "@/types";
 
 const empty: MasterResume = {
   fullName: "",
@@ -21,6 +21,8 @@ const empty: MasterResume = {
   experience: [],
   projects: [],
   skills: [],
+  certifications: [],
+  achievements: [],
 };
 
 const uid = () => crypto.randomUUID();
@@ -53,6 +55,10 @@ export default function MasterResumePage() {
     setM({ ...m, experience: [...m.experience, { id: uid(), company: "", role: "", startDate: "", endDate: "", bullets: [""] }] });
   const addProj = () =>
     setM({ ...m, projects: [...m.projects, { id: uid(), name: "", description: "" }] });
+  const addCert = () =>
+    setM({ ...m, certifications: [...(m.certifications ?? []), { id: uid(), name: "" }] });
+  const addAch = () =>
+    setM({ ...m, achievements: [...(m.achievements ?? []), { id: uid(), title: "" }] });
 
   const updEdu = (id: string, patch: Partial<Education>) =>
     setM({ ...m, education: m.education.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
@@ -60,6 +66,10 @@ export default function MasterResumePage() {
     setM({ ...m, experience: m.experience.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
   const updProj = (id: string, patch: Partial<ProjectItem>) =>
     setM({ ...m, projects: m.projects.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
+  const updCert = (id: string, patch: Partial<Certification>) =>
+    setM({ ...m, certifications: (m.certifications ?? []).map((c) => (c.id === id ? { ...c, ...patch } : c)) });
+  const updAch = (id: string, patch: Partial<Achievement>) =>
+    setM({ ...m, achievements: (m.achievements ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a)) });
 
   return (
     <div className="h-full overflow-y-auto p-8">
@@ -139,6 +149,34 @@ export default function MasterResumePage() {
         <Card className="p-6 space-y-3">
           <h2 className="font-medium">Skills</h2>
           <Textarea placeholder="comma, separated, skills" value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
+        </Card>
+
+        <Card className="p-6 space-y-3">
+          <div className="flex justify-between items-center"><h2 className="font-medium">Certifications</h2><Button size="sm" variant="outline" onClick={addCert}><Plus className="h-3 w-3 mr-1" />Add</Button></div>
+          {(m.certifications ?? []).map((c) => (
+            <div key={c.id} className="border border-border rounded p-3 space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <Input placeholder="Name" value={c.name} onChange={(ev) => updCert(c.id, { name: ev.target.value })} />
+                <Input placeholder="Issuer" value={c.issuer ?? ""} onChange={(ev) => updCert(c.id, { issuer: ev.target.value })} />
+                <Input placeholder="Date" value={c.date ?? ""} onChange={(ev) => updCert(c.id, { date: ev.target.value })} />
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setM({ ...m, certifications: (m.certifications ?? []).filter((x) => x.id !== c.id) })}><Trash2 className="h-3 w-3" /></Button>
+            </div>
+          ))}
+        </Card>
+
+        <Card className="p-6 space-y-3">
+          <div className="flex justify-between items-center"><h2 className="font-medium">Achievements</h2><Button size="sm" variant="outline" onClick={addAch}><Plus className="h-3 w-3 mr-1" />Add</Button></div>
+          {(m.achievements ?? []).map((a) => (
+            <div key={a.id} className="border border-border rounded p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Title" value={a.title} onChange={(ev) => updAch(a.id, { title: ev.target.value })} />
+                <Input placeholder="Date" value={a.date ?? ""} onChange={(ev) => updAch(a.id, { date: ev.target.value })} />
+              </div>
+              <Textarea placeholder="Description" value={a.description ?? ""} onChange={(ev) => updAch(a.id, { description: ev.target.value })} />
+              <Button size="sm" variant="ghost" onClick={() => setM({ ...m, achievements: (m.achievements ?? []).filter((x) => x.id !== a.id) })}><Trash2 className="h-3 w-3" /></Button>
+            </div>
+          ))}
         </Card>
 
         <div className="pb-12">
