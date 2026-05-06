@@ -55,6 +55,10 @@ export default function MasterResumePage() {
     setM({ ...m, experience: [...m.experience, { id: uid(), company: "", role: "", startDate: "", endDate: "", bullets: [""] }] });
   const addProj = () =>
     setM({ ...m, projects: [...m.projects, { id: uid(), name: "", description: "" }] });
+  const addCert = () =>
+    setM({ ...m, certifications: [...(m.certifications ?? []), { id: uid(), name: "" }] });
+  const addAch = () =>
+    setM({ ...m, achievements: [...(m.achievements ?? []), { id: uid(), title: "" }] });
 
   const updEdu = (id: string, patch: Partial<Education>) =>
     setM({ ...m, education: m.education.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
@@ -62,6 +66,10 @@ export default function MasterResumePage() {
     setM({ ...m, experience: m.experience.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
   const updProj = (id: string, patch: Partial<ProjectItem>) =>
     setM({ ...m, projects: m.projects.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
+  const updCert = (id: string, patch: Partial<Certification>) =>
+    setM({ ...m, certifications: (m.certifications ?? []).map((c) => (c.id === id ? { ...c, ...patch } : c)) });
+  const updAch = (id: string, patch: Partial<Achievement>) =>
+    setM({ ...m, achievements: (m.achievements ?? []).map((a) => (a.id === id ? { ...a, ...patch } : a)) });
 
   return (
     <div className="h-full overflow-y-auto p-8">
