@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FileText, Sparkles, Plus, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { listProjects, createProject, getMasterResume } from "@/lib/resumeStore";
+import { listProjects, createProject, getMasterLatexResume } from "@/lib/resumeStore";
 import type { ResumeProject } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,13 +14,16 @@ export default function Dashboard() {
   const [hasMaster, setHasMaster] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     listProjects(user.uid).then(setProjects);
-    getMasterResume(user.uid).then((m) => setHasMaster(!!m?.fullName));
+    getMasterLatexResume(user.uid).then((m) => setHasMaster(!!m?.latexCode)).catch(() => setHasMaster(false));
   }, [user?.uid]);
 
   const handleNew = async () => {
-    if (!user) return;
+    if (!user?.uid) {
+      console.error('No authenticated user — cannot write to Firestore');
+      return;
+    }
     const name = prompt("Project name?", "Untitled Resume");
     if (!name) return;
     const p = await createProject(user.uid, name);
@@ -44,7 +47,7 @@ export default function Dashboard() {
           <Card className="p-6 flex items-center justify-between bg-muted/30">
             <div>
               <h3 className="font-medium">Finish onboarding</h3>
-              <p className="text-sm text-muted-foreground">Build your master resume to start generating tailored versions.</p>
+              <p className="text-sm text-muted-foreground">Upload your master LaTeX resume to start generating tailored versions.</p>
             </div>
             <Button asChild><Link to="/master">Set up <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
           </Card>

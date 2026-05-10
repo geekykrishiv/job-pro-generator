@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserSettings, saveUserSettings } from "@/lib/resumeStore";
+import { getUserSettings, saveUserSettings, validateGeminiKey } from "@/lib/resumeStore";
 import { auth } from "@/lib/firebase";
 import { updateProfile, deleteUser } from "firebase/auth";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { Loader2, CheckCircle2, XCircle, Eye, EyeOff, ExternalLink } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -16,9 +17,12 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(true);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  const [showKey, setShowKey] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [keyValid, setKeyValid] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     setDisplayName(user.displayName ?? "");
     getUserSettings(user.uid).then((s) => {
       setKey(s.geminiKey ?? "");
@@ -31,8 +35,35 @@ export default function Settings() {
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
+  // Reset validation status when key changes
+  useEffect(() => {
+    setKeyValid(null);
+  }, [key]);
+
+  const testKey = async () => {
+    if (!key.trim()) {
+      toast.error("Enter an API key first.");
+      return;
+    }
+    setValidating(true);
+    try {
+      const valid = await validateGeminiKey(key.trim());
+      setKeyValid(valid);
+      if (valid) {
+        toast.success("API key is valid!");
+      } else {
+        toast.error("Invalid API key. Check and try again.");
+      }
+    } catch {
+      setKeyValid(false);
+      toast.error("Failed to validate key.");
+    } finally {
+      setValidating(false);
+    }
+  };
+
   const save = async () => {
-    if (!user) return;
+    if (!user?.uid) return;
     await saveUserSettings(user.uid, { geminiKey: key.trim() });
     if (displayName !== (user.displayName ?? "")) {
       await updateProfile(user, { displayName });
@@ -41,7 +72,7 @@ export default function Settings() {
   };
 
   const handleDelete = async () => {
-    if (!user) return;
+    if (!user?.uid) return;
     if (!confirm("Permanently delete your account? This cannot be undone.")) return;
     try {
       await deleteUser(user);
@@ -73,20 +104,65 @@ export default function Settings() {
 
         <Card className="p-6 space-y-4">
           <h2 className="font-medium">Gemini API Key</h2>
-          <Input
-            type="password"
-            placeholder="AIza..."
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            disabled={loading}
-          />
-          <p className="text-xs text-muted-foreground">
-            Get a key at{" "}
-            <a className="underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-              aistudio.google.com/apikey
-            </a>
-            . Requests are made directly from your browser.
-          </p>
+          <div className="space-y-3">
+            <div className="relative">
+              <Input
+                type={showKey ? "text" : "password"}
+                placeholder="AIza..."
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                disabled={loading}
+                className={`pr-20 ${
+                  keyValid === true
+                    ? "border-green-500/50 focus-visible:ring-green-500/20"
+                    : keyValid === false
+                    ? "border-destructive/50 focus-visible:ring-destructive/20"
+                    : ""
+                }`}
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {keyValid === true && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                {keyValid === false && <XCircle className="h-4 w-4 text-destructive" />}
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={testKey}
+                disabled={validating || !key.trim()}
+              >
+                {validating ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    Testing...
+                  </>
+                ) : (
+                  "Test Key"
+                )}
+              </Button>
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                Get a key <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Your API key is stored in Firestore under your user account. Requests are made directly from your browser.
+            </p>
+          </div>
         </Card>
 
         <Card className="p-6 space-y-4">

@@ -6,9 +6,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { listProjects, createProject } from "@/lib/resumeStore";
 import type { ResumeProject } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, User, Settings, LogOut, Search, Sparkles } from "lucide-react";
+import { Plus, FileText, Settings, LogOut, Search, Sparkles, Code } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import ATSBadge from "@/components/ATSBadge";
 
 export default function Sidebar() {
   const { user } = useAuth();
@@ -72,20 +73,28 @@ export default function Sidebar() {
         )}
         {projects
           .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-          .map((p) => (
-          <NavLink
-            key={p.id}
-            to={`/project/${p.id}`}
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-2 py-2 rounded text-sm hover:bg-sidebar-accent ${
-                isActive ? "bg-sidebar-accent font-medium" : ""
-              }`
-            }
-          >
-            <FileText className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{p.name}</span>
-          </NavLink>
-        ))}
+          .map((p) => {
+            const latestScore = p.versions?.[p.versions.length - 1]?.atsScore?.score;
+            return (
+              <NavLink
+                key={p.id}
+                to={`/project/${p.id}`}
+                className={({ isActive }) =>
+                  `flex items-center justify-between px-2 py-2 rounded text-sm hover:bg-sidebar-accent ${
+                    isActive ? "bg-sidebar-accent font-medium" : ""
+                  }`
+                }
+              >
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{p.name}</span>
+                </div>
+                {latestScore ? (
+                  <ATSBadge score={latestScore} className="ml-2 scale-90 origin-right" />
+                ) : null}
+              </NavLink>
+            );
+          })}
       </div>
 
       <div className="border-t border-border p-2 space-y-1">
@@ -97,7 +106,7 @@ export default function Sidebar() {
             }`
           }
         >
-          <User className="h-4 w-4" /> Master Resume
+          <Code className="h-4 w-4" /> Master LaTeX
         </NavLink>
         <NavLink
           to="/settings"

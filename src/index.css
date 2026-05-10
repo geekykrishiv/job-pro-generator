@@ -108,8 +108,14 @@ All colors MUST be HSL.
   }
 }
 
+/* ─── LaTeX Preview ──────────────────────────────────────────────────── */
+
 .latex-preview {
   font-family: 'Georgia', 'Times New Roman', serif;
+  background: white;
+  color: black;
+  padding: 2rem;
+  min-height: 600px;
 }
 .latex-preview h1, .latex-preview h2, .latex-preview h3 {
   font-weight: 600;
@@ -117,3 +123,147 @@ All colors MUST be HSL.
   margin-bottom: 0.4em;
 }
 .latex-preview p { margin-bottom: 0.6em; }
+
+/* ─── Chat Message Bubbles ───────────────────────────────────────────── */
+
+.chat-message {
+  animation: chatFadeIn 0.3s ease-out;
+}
+
+@keyframes chatFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Markdown-like bold in assistant messages */
+.chat-content strong {
+  font-weight: 600;
+}
+
+/* ─── Typing Indicator Dots ──────────────────────────────────────────── */
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typing-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--muted-foreground));
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+.typing-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+/* ─── LaTeX Code Editor ──────────────────────────────────────────────── */
+
+.latex-code-editor {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+  tab-size: 2;
+  -moz-tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.latex-code-editor::placeholder {
+  color: #6c7086;
+}
+
+/* ─── Chat Input Bar ─────────────────────────────────────────────────── */
+
+.chat-input-bar {
+  position: sticky;
+  bottom: 0;
+}
+
+/* ─── Custom Scrollbar ───────────────────────────────────────────────── */
+
+.latex-code-editor::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.latex-code-editor::-webkit-scrollbar-track,
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.latex-code-editor::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────── */
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in.slide-in-from-top-2 {
+  animation: slideInFromTop 0.2s ease-out;
+}
+
+/* ─── Print Styles (for PDF generation) ──────────────────────────────── */
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .latex-preview,
+  .latex-preview * {
+    visibility: visible;
+  }
+  .latex-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+  }
+}
