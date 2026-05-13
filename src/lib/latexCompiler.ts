@@ -1,5 +1,8 @@
 const TIMEOUT_MS = 90_000;
 
+/** Same-origin route: dev/preview middleware + Vercel serverless forward to LaTeX.Online. */
+export const LATEX_COMPILE_API = "/api/latex-compile";
+
 export interface CompileResult {
   pdfBlob: Blob | null;
   errorLog: string;
@@ -7,30 +10,23 @@ export interface CompileResult {
 }
 
 export async function compileLatex(latex: string): Promise<CompileResult> {
-  const formData = new FormData();
-  const texFile = new Blob([latex], { type: 'text/plain' });
-  formData.append('file', texFile, 'resume.tex');
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const COMPILE_URL = import.meta.env.DEV
-      ? '/api/latex-compile'          // proxied in dev (bypasses CORS)
-      : 'https://latexonline.cc/compile'; // direct in prod (may need backend)
-
-    const response = await fetch(COMPILE_URL, {
-      method: 'POST',
-      body: formData,
+    const response = await fetch(LATEX_COMPILE_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ latex }),
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    const contentType = response.headers.get('content-type') ?? '';
+    const contentType = response.headers.get("content-type") ?? "";
 
-    if (response.ok && contentType.includes('application/pdf')) {
-      return { pdfBlob: await response.blob(), errorLog: '', success: true };
+    if (response.ok && contentType.includes("application/pdf")) {
+      return { pdfBlob: await response.blob(), errorLog: "", success: true };
     }
 
     const errorText = await response.text();
@@ -42,17 +38,17 @@ export async function compileLatex(latex: string): Promise<CompileResult> {
   } catch (err: unknown) {
     clearTimeout(timeoutId);
 
-    // If CORS blocks the request, fall back to base64 download approach
-    if (err instanceof TypeError && err.message.includes('fetch')) {
+    if (err instanceof TypeError && err.message.includes("fetch")) {
       return {
         pdfBlob: null,
-        errorLog: 'CORS_ERROR: Cannot reach compiler. Please use the Copy LaTeX button and paste into overleaf.com',
+        errorLog:
+          "CORS_ERROR: Cannot reach compiler. If you use static hosting without /api, deploy to Vercel or run `npm run dev` / `npm run preview`.",
         success: false,
       };
     }
 
-    if (err instanceof Error && err.name === 'AbortError') {
-      return { pdfBlob: null, errorLog: 'Timed out after 90s.', success: false };
+    if (err instanceof Error && err.name === "AbortError") {
+      return { pdfBlob: null, errorLog: "Timed out after 90s.", success: false };
     }
     return { pdfBlob: null, errorLog: String(err), success: false };
   }

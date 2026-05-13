@@ -1,37 +1,47 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { compileViaLatexOnline } from "../src/lib/latexCompileUpstream";
+
+function getLatexFromRequest(req: VercelRequest): string | undefined {
+  const body = req.body;
+  if (body && typeof body === "object" && "latex" in body && typeof (body as { latex: unknown }).latex === "string") {
+    return (body as { latex: string }).latex;
+  }
+  if (typeof body === "string") {
+    try {
+      const parsed = JSON.parse(body) as { latex?: unknown };
+      if (typeof parsed.latex === "string") return parsed.latex;
+    } catch {
+      /* ignore */
+    }
+  }
+  return undefined;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const latex = getLatexFromRequest(req);
+  if (latex === undefined) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.status(400).send("Missing JSON body with field: latex (string)");
   }
 
   try {
-    // Forward the multipart form data to latexonline.cc
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(chunk as Buffer);
-    }
-    const body = Buffer.concat(chunks);
+    const upstreamResponse = await compileViaLatexOnline(latex);
+    const upstreamContentType = upstreamResponse.headers.get("content-type") ?? "";
+    const pdfBuffer = Buffer.from(await upstreamResponse.arrayBuffer());
 
-    const contentType = req.headers['content-type'] ?? 'multipart/form-data';
-
-    const upstreamResponse = await fetch('https://latexonline.cc/compile', {
-      method: 'POST',
-      headers: { 'Content-Type': contentType },
-      body,
-    });
-
-    const upstreamContentType = upstreamResponse.headers.get('content-type') ?? '';
-
-    if (upstreamResponse.ok && upstreamContentType.includes('application/pdf')) {
-      const pdfBuffer = Buffer.from(await upstreamResponse.arrayBuffer());
-      res.setHeader('Content-Type', 'application/pdf');
+    if (upstreamResponse.ok && upstreamContentType.includes("application/pdf")) {
+      res.setHeader("Content-Type", "application/pdf");
       return res.status(200).send(pdfBuffer);
-    } else {
-      const errorText = await upstreamResponse.text();
-      res.setHeader('Content-Type', 'text/plain');
-      return res.status(500).send(errorText);
     }
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    const status =
+      upstreamResponse.status >= 400 ? upstreamResponse.status : 502;
+    return res.status(status).send(pdfBuffer.toString("utf8"));
   } catch (err) {
     return res.status(500).json({ error: String(err) });
   }

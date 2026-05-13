@@ -156,7 +156,9 @@ ${project.jobDescription}`;
             assistantContent += `\n\n⚠️ LaTeX generated but PDF compilation failed. You can fix the syntax manually in the editor.`;
           }
         } else {
-          assistantContent = `❌ Pipeline failed to generate a resume.`;
+          const errorStep = finalSteps.find(s => s.status === 'error');
+          const reason = errorStep?.detail || "Unknown error";
+          assistantContent = `❌ Pipeline failed to generate a resume.\n\n**Reason:** ${reason}`;
         }
 
         const assistantMsg: ChatMessage = {

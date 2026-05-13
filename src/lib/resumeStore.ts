@@ -12,7 +12,8 @@ import {
 import { db } from "./firebase";
 import type { MasterLatexResume, ResumeProject, ResumeVersion, ChatMessage, ATSScoreResult } from "@/types";
 import { GoogleGenAI } from "@google/genai";
-import { GEMINI_CONFIG } from "@/config/gemini";
+import { GEMINI_MODEL_CHAIN } from "@/config/gemini";
+import { extractGeminiHttpStatus, isRetryableGeminiError } from "./gemini";
 import { deleteField } from 'firebase/firestore';
 
 function removeUndefined(obj: Record<string, unknown>): Record<string, unknown> {
@@ -171,25 +172,27 @@ export async function restoreResumeVersion(
 // ─── API Key Validation ─────────────────────────────────────────────────
 
 export async function validateGeminiKey(apiKey: string): Promise<boolean> {
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    
-    // We attempt a very lightweight generateContent call to validate the key
-    await ai.models.generateContent({
-      model: GEMINI_CONFIG.PRIMARY_MODEL,
-      contents: "Reply with OK",
-    });
+  const trimmed = apiKey.trim();
+  if (!trimmed) return false;
 
-    return true;
-  } catch (error: any) {
-    // If it's a rate limit error (429) or model not found (404), the key itself is valid
-    const isRateLimit = error?.status === 429 || error?.message?.includes("429");
-    const isModelNotFound = error?.status === 404 || error?.message?.includes("not found");
-    
-    if (isRateLimit || isModelNotFound) {
+  const ai = new GoogleGenAI({ apiKey: trimmed });
+
+  for (let i = 0; i < GEMINI_MODEL_CHAIN.length; i++) {
+    const model = GEMINI_MODEL_CHAIN[i];
+    try {
+      await ai.models.generateContent({
+        model,
+        contents: "Reply with OK",
+      });
       return true;
+    } catch (error: unknown) {
+      const status = extractGeminiHttpStatus(error);
+      if (status === 401 || status === 403) return false;
+      if (status === 429) return true;
+      if (isRetryableGeminiError(error) && i < GEMINI_MODEL_CHAIN.length - 1) continue;
+      return false;
     }
-
-    return false;
   }
+
+  return false;
 }
