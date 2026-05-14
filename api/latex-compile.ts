@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { compileViaLatexOnline } from "../src/lib/latexCompileUpstream";
+import { compileViaLatexOnline } from "./lib/latexCompileUpstream";
 
 function getLatexFromRequest(req: VercelRequest): string | undefined {
   const body = req.body;
