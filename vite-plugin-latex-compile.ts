@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { Plugin, PreviewServer, ViteDevServer } from "vite";
-import { compileViaLatexOnline } from "./api/lib/latexCompileUpstream";
+import { compileViaLatexOnline } from "./api/latex-compile";
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
