@@ -1,5 +1,4 @@
-import { callGemini } from "./gemini";
-import { MASTER_RESUME } from "@/config/masterResume";
+import { callClaude } from "./claude";
 import { LATEX_PREAMBLE } from "@/config/latexTemplate";
 import type { ATSScoreResult } from "@/types";
 
@@ -13,7 +12,11 @@ function cleanLatex(raw: string): string {
   return idx > 0 ? s.slice(idx).trim() : s;
 }
 
-export async function generateResume(jd: string, geminiKey: string): Promise<string> {
+export async function generateResume(
+  jd: string,
+  masterResumeLatex: string,
+  apiKey: string,
+): Promise<string> {
   const prompt = `You are an expert ATS resume writer and LaTeX specialist.
 
 Generate a polished, complete, 1-page LaTeX resume for the job description below.
@@ -24,13 +27,14 @@ SECTION ORDER (follow exactly):
 2. Summary (2-3 sentences tailored to the role)
 3. Education
 4. Skills (NO soft skills — only Languages, Frameworks, Tools, Concepts)
-5. Projects (Drum Vision ALWAYS first, then 2-3 more by JD relevance)
-6. Achievements (always include both competition wins)
-7. Positions of Responsibility (always include both roles)
+5. Projects (select projects by JD relevance from the master resume)
+6. Achievements (include competition wins if present in master)
+7. Positions of Responsibility (include roles if present in master)
 
-PROJECT PRIORITY RULE — CRITICAL:
-- ALWAYS put Drum Vision as the FIRST project. Never skip it.
-- Select 2-3 additional projects from P2-P5 based on JD relevance.
+PROJECT RULE — CRITICAL:
+- Select projects from the master resume based on JD relevance.
+- Do NOT include projects that are not in the master resume.
+- Prioritize the most relevant projects for the role.
 
 LATEX RULES (follow strictly):
 - Every \\resumeSubheading must have exactly 4 arguments in 4 separate {}
@@ -43,14 +47,6 @@ LATEX RULES (follow strictly):
 - Keep every bullet complete — never truncate mid-sentence
 - Each bullet max 115 characters
 - Right-column text in \\resumeSubheading (args #2 and #4) must be SHORT — max 22 characters
-  Examples: "Personal Project" ✓  |  "Current Personal Project" ✗ (too long, will overflow)
-  Acceptable short forms:
-    "Current Personal Project" → "Personal Project"
-    "Academic / Personal Project" → "Academic Project"
-    "Client Project" → "Client Project" (fine as-is)
-    "Group Project" → "Group Project" (fine as-is)
-    "2023 -- 2027 (Pursuing)" → "2023 -- 2027" (drop the parenthetical)
-- If a right-column label is longer than 22 chars, abbreviate it — never let it overflow
 
 CRITICAL OUTPUT RULE:
 - Output ONLY raw LaTeX starting with \\documentclass — nothing else
@@ -59,19 +55,23 @@ CRITICAL OUTPUT RULE:
 USE THIS EXACT PREAMBLE:
 ${LATEX_PREAMBLE}
 
-MASTER RESUME:
-${MASTER_RESUME}
+MASTER RESUME (LaTeX — sole source of truth):
+${masterResumeLatex}
 
 JOB DESCRIPTION:
 ${jd}
 
 Raw LaTeX:`;
 
-  const rawResult = await callGemini(geminiKey, prompt);
+  const rawResult = await callClaude(apiKey, prompt);
   return cleanLatex(rawResult);
 }
 
-export async function scoreResume(latex: string, jd: string, geminiKey: string): Promise<ATSScoreResult> {
+export async function scoreResume(
+  latex: string,
+  jd: string,
+  apiKey: string,
+): Promise<ATSScoreResult> {
   const prompt = `You are an ATS evaluator. Score this resume 0-100 against the job description.
 
 Scoring:
@@ -93,10 +93,9 @@ ${latex}
 JSON:`;
 
   try {
-    const rawResult = await callGemini(geminiKey, prompt);
+    const rawResult = await callClaude(apiKey, prompt);
     const cleaned = rawResult.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
     const parsed = JSON.parse(cleaned) as ATSScoreResult;
-    // ensure structure matches
     return {
       score: parsed.score || 0,
       keyword_match: parsed.keyword_match || 0,
@@ -122,30 +121,27 @@ JSON:`;
   }
 }
 
-export async function rewriteResume(latex: string, jd: string, scoreData: ATSScoreResult, geminiKey: string): Promise<string> {
+export async function rewriteResume(
+  latex: string,
+  jd: string,
+  scoreData: ATSScoreResult,
+  masterResumeLatex: string,
+  apiKey: string,
+): Promise<string> {
   const prompt = `You are an expert ATS resume writer and LaTeX specialist.
 
 Rewrite the resume to improve its ATS score using the feedback below.
 
-MANDATORY (never remove):
-- Drum Vision must remain the FIRST project
-- Both Achievements (IEEE + Navriti) must stay
-- Positions of Responsibility section with both roles must stay
-- Skills section must NOT have a Soft Skills row
+MANDATORY:
+- Only use projects and content present in the master resume
+- Do NOT add projects removed from the master resume
+- Keep Skills section without a Soft Skills row if the master has none
 
 RULES:
 - Incorporate missing keywords naturally into bullets
 - Keep every bullet complete, max 115 chars
 - Fix any LaTeX syntax issues you notice while rewriting
 - Right-column text in \\resumeSubheading (args #2 and #4) must be SHORT — max 22 characters
-  Examples: "Personal Project" ✓  |  "Current Personal Project" ✗ (too long, will overflow)
-  Acceptable short forms:
-    "Current Personal Project" → "Personal Project"
-    "Academic / Personal Project" → "Academic Project"
-    "Client Project" → "Client Project" (fine as-is)
-    "Group Project" → "Group Project" (fine as-is)
-    "2023 -- 2027 (Pursuing)" → "2023 -- 2027" (drop the parenthetical)
-- If a right-column label is longer than 22 chars, abbreviate it — never let it overflow
 - Keep to 1 page
 - Never fabricate anything not in the master resume
 - Output ONLY raw LaTeX starting with \\documentclass — no markdown fences
@@ -153,8 +149,8 @@ RULES:
 PREAMBLE TO USE:
 ${LATEX_PREAMBLE}
 
-MASTER RESUME:
-${MASTER_RESUME}
+MASTER RESUME (LaTeX — sole source of truth):
+${masterResumeLatex}
 
 CURRENT RESUME:
 ${latex}
@@ -169,11 +165,11 @@ ${jd}
 
 Rewritten LaTeX:`;
 
-  const rawResult = await callGemini(geminiKey, prompt);
+  const rawResult = await callClaude(apiKey, prompt);
   return cleanLatex(rawResult);
 }
 
-export async function fixLatex(latex: string, errorLog: string, geminiKey: string): Promise<string> {
+export async function fixLatex(latex: string, errorLog: string, apiKey: string): Promise<string> {
   const prompt = `You are a LaTeX expert. Fix ALL compilation errors in this resume.
 
 COMPILER ERROR LOG:
@@ -183,23 +179,13 @@ FIX RULES:
 - Output ONLY fixed raw LaTeX starting with \\documentclass
 - No markdown fences, no explanation
 - Keep all resume content intact — only fix LaTeX syntax
-- Common fixes:
-  * Escape: & → \\&, % → \\%, _ → \\_, # → \\#
-  * Every \\begin{X} needs \\end{X}
-  * \\resumeSubheading needs exactly 4 args in 4 separate {}
-  * Never nest \\resumeSubheading inside \\resumeItemListStart
-  * Close \\resumeItemListEnd before each new \\resumeSubheading
-  * File must end with \\end{document}
-  * Right-column text in \\resumeSubheading (args #2 and #4) must be SHORT — max 22 characters
-    Examples: "Current Personal Project" → "Personal Project"
-  * If a right-column label is longer than 22 chars, abbreviate it — never let it overflow
-  * If \\resumeSubheading uses \\begin{tabular*} with \\extracolsep{\\fill}, replace it with \\begin{tabularx}{0.97\\textwidth}{X r} — this prevents right-column clipping. Also add \\usepackage{tabularx} to the preamble if not already present.
+- File must end with \\end{document}
 
 BROKEN LATEX:
 ${latex}
 
 Fixed LaTeX:`;
 
-  const rawResult = await callGemini(geminiKey, prompt);
+  const rawResult = await callClaude(apiKey, prompt);
   return cleanLatex(rawResult);
 }

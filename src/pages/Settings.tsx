@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserSettings, saveUserSettings, validateGeminiKey } from "@/lib/resumeStore";
+import { getUserSettings, saveUserSettings, validateAnthropicKey } from "@/lib/resumeStore";
+import { resolveAnthropicKey } from "@/lib/claude";
 import { auth } from "@/lib/firebase";
 import { updateProfile, deleteUser } from "firebase/auth";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ export default function Settings() {
     if (!user?.uid) return;
     setDisplayName(user.displayName ?? "");
     getUserSettings(user.uid).then((s) => {
-      setKey(s.geminiKey ?? "");
+      setKey(s.anthropicKey ?? s.geminiKey ?? "");
       setLoading(false);
     });
   }, [user?.uid]);
@@ -47,7 +48,7 @@ export default function Settings() {
     }
     setValidating(true);
     try {
-      const valid = await validateGeminiKey(key.trim());
+      const valid = await validateAnthropicKey(key.trim());
       setKeyValid(valid);
       if (valid) {
         toast.success("API key is valid!");
@@ -64,7 +65,7 @@ export default function Settings() {
 
   const save = async () => {
     if (!user?.uid) return;
-    await saveUserSettings(user.uid, { geminiKey: key.trim() });
+    await saveUserSettings(user.uid, { anthropicKey: key.trim() });
     if (displayName !== (user.displayName ?? "")) {
       await updateProfile(user, { displayName });
     }
@@ -103,12 +104,12 @@ export default function Settings() {
         </Card>
 
         <Card className="p-6 space-y-4">
-          <h2 className="font-medium">Gemini API Key</h2>
+          <h2 className="font-medium">Anthropic API Key</h2>
           <div className="space-y-3">
             <div className="relative">
               <Input
                 type={showKey ? "text" : "password"}
-                placeholder="AIza..."
+                placeholder="sk-ant-..."
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 disabled={loading}
@@ -150,7 +151,7 @@ export default function Settings() {
                 )}
               </Button>
               <a
-                href="https://aistudio.google.com/apikey"
+                href="https://console.anthropic.com/settings/keys"
                 target="_blank"
                 rel="noreferrer"
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
@@ -160,7 +161,10 @@ export default function Settings() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Your API key is stored in Firestore under your user account. Requests are made directly from your browser.
+              Model: Claude Sonnet 4 (<code className="text-[10px]">claude-sonnet-4-20250514</code>).
+              Key is stored in Firestore, or set <code className="text-[10px]">VITE_ANTHROPIC_API_KEY</code> in{" "}
+              <code className="text-[10px]">.env.local</code>
+              {resolveAnthropicKey() ? " (env key detected)." : "."}
             </p>
           </div>
         </Card>

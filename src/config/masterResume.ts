@@ -1,3 +1,7 @@
+/**
+ * @deprecated Not used by the app. Master resume content comes from Firestore
+ * (`users/{uid}.masterLatexResume`) via the Master Resume page upload/save.
+ */
 export const MASTER_RESUME = `=== KRISHIV PATEL — MASTER RESUME ===
 
 CONTACT:

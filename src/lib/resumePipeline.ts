@@ -4,7 +4,8 @@ import type { ATSScoreResult, GenerationStep } from "@/types";
 
 interface PipelineParams {
   jd: string;
-  geminiKey: string;
+  masterResumeLatex: string;
+  apiKey: string;
   onStepUpdate: (steps: GenerationStep[]) => void;
   onScoreUpdate: (score: ATSScoreResult) => void;
   ATS_THRESHOLD?: number;
@@ -15,6 +16,7 @@ interface PipelineParams {
 interface PipelineResult {
   latex: string;
   pdfBlob: Blob | null;
+  pdfUrl?: string | null;
   bestScore: number;
   atsScore?: ATSScoreResult | null;
   finalSteps: GenerationStep[];
@@ -22,7 +24,8 @@ interface PipelineResult {
 
 export async function runResumePipeline({
   jd,
-  geminiKey,
+  masterResumeLatex,
+  apiKey,
   onStepUpdate,
   onScoreUpdate,
   ATS_THRESHOLD = 80,
@@ -44,16 +47,15 @@ export async function runResumePipeline({
   };
 
   try {
-    // ─── STEP 1: Generate ──────────────────────────────────────────────────
     let currentLatex = '';
     try {
-      updateStep('generate', { status: 'running', detail: 'Calling Gemini AI...' });
-      currentLatex = await generateResume(jd, geminiKey);
-      
+      updateStep('generate', { status: 'running', detail: 'Calling Claude...' });
+      currentLatex = await generateResume(jd, masterResumeLatex, apiKey);
+
       if (!currentLatex || currentLatex.trim().length < 100) {
-        throw new Error('Gemini returned empty or invalid LaTeX');
+        throw new Error('Claude returned empty or invalid LaTeX');
       }
-      
+
       updateStep('generate', { status: 'done', detail: 'Resume generated' });
     } catch (err) {
       updateStep('generate', { status: 'error', detail: `Generation failed: ${String(err)}` });
@@ -67,16 +69,15 @@ export async function runResumePipeline({
       };
     }
 
-    // ─── STEP 2: ATS Score & Rewrite Loop ──────────────────────────────────
     updateStep('ats', { status: 'running' });
     let bestLatex = currentLatex;
     let bestScoreObj: ATSScoreResult | null = null;
     let atsAttempts = 0;
 
     while (atsAttempts <= MAX_ATS_RETRIES) {
-      const scoreData = await scoreResume(currentLatex, jd, geminiKey);
+      const scoreData = await scoreResume(currentLatex, jd, apiKey);
       onScoreUpdate(scoreData);
-      
+
       updateStep('ats', { detail: `Attempt ${atsAttempts + 1}: Score ${scoreData.score}/100` });
 
       if (!bestScoreObj || scoreData.score > bestScoreObj.score) {
@@ -88,22 +89,20 @@ export async function runResumePipeline({
         break;
       }
 
-      // Rewrite needed
       atsAttempts++;
       updateStep('ats', { detail: `Score ${scoreData.score}/100 < ${ATS_THRESHOLD}. Rewriting (Attempt ${atsAttempts}/${MAX_ATS_RETRIES})...` });
-      currentLatex = await rewriteResume(currentLatex, jd, scoreData, geminiKey);
+      currentLatex = await rewriteResume(currentLatex, jd, scoreData, masterResumeLatex, apiKey);
     }
-    
-    currentLatex = bestLatex; // Proceed with the best version we found
+
+    currentLatex = bestLatex;
     updateStep('ats', { status: 'done', detail: `Final Score: ${bestScoreObj?.score || 0}/100` });
 
-    // ─── STEP 3: Compile & Fix Loop ────────────────────────────────────────
     updateStep('compile', { status: 'running' });
     let pdfBlob: Blob | null = null;
 
     for (let attempt = 1; attempt <= MAX_FIX_RETRIES; attempt++) {
       updateStep('compile', { detail: attempt > 1 ? `Compile error — fixing (attempt ${attempt}/${MAX_FIX_RETRIES})...` : 'Compiling...' });
-      
+
       const { pdfBlob: result, errorLog, success } = await compileLatex(currentLatex);
 
       if (success && result) {
@@ -113,7 +112,7 @@ export async function runResumePipeline({
       }
 
       if (attempt < MAX_FIX_RETRIES) {
-        currentLatex = await fixLatex(currentLatex, errorLog, geminiKey);
+        currentLatex = await fixLatex(currentLatex, errorLog, apiKey);
       } else {
         updateStep('compile', { status: 'error', detail: `Failed after ${MAX_FIX_RETRIES} attempts` });
       }
@@ -129,17 +128,16 @@ export async function runResumePipeline({
       atsScore: bestScoreObj ?? null,
       finalSteps: steps ?? [],
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Pipeline Error:", error);
-    // Mark any running steps as error
     steps.forEach(s => {
       if (s.status === 'running') {
         s.status = 'error';
-        s.detail = error.message || 'Pipeline failed';
+        s.detail = error instanceof Error ? error.message : 'Pipeline failed';
       }
     });
     onStepUpdate([...steps]);
-    
+
     return {
       latex: "",
       pdfBlob: null,

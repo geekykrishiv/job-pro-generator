@@ -8,6 +8,7 @@ import {
   saveResumeVersion
 } from "@/lib/resumeStore";
 import { runResumePipeline } from "@/lib/resumePipeline";
+import { resolveAnthropicKey } from "@/lib/claude";
 import type {
   ResumeProject,
   MasterLatexResume,
@@ -63,7 +64,7 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
       ]);
       setProject(p);
       setMasterLatex(m);
-      setApiKey(s.geminiKey ?? "");
+      setApiKey(s.anthropicKey ?? s.geminiKey ?? "");
       setLoading(false);
     })();
   }, [user?.uid, projectId]);
@@ -79,13 +80,20 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
         return;
       }
 
-      if (!apiKey) {
-        toast.error("Add your Gemini API key in Settings.");
+      if (!resolveAnthropicKey(apiKey)) {
+        toast.error("Add your Anthropic API key in Settings (or VITE_ANTHROPIC_API_KEY in .env.local).");
         return;
       }
-      if (!masterLatex?.latexCode) {
+
+      const freshMaster = await getMasterLatexResume(user.uid);
+      const masterLatexCode = freshMaster?.latexCode?.trim() ?? "";
+      if (!masterLatexCode) {
         toast.error("Upload your Master LaTeX Resume first.");
         return;
+      }
+
+      if (freshMaster) {
+        setMasterLatex(freshMaster);
       }
 
       const userMsg: ChatMessage = {
@@ -131,7 +139,8 @@ ${project.jobDescription}`;
       try {
         const result = await runResumePipeline({
           jd: jdText,
-          geminiKey: apiKey,
+          masterResumeLatex: masterLatexCode,
+          apiKey,
           onStepUpdate: (steps) => {
             setPipelineSteps([...steps]);
             const runningStep = steps.find(s => s.status === 'running');

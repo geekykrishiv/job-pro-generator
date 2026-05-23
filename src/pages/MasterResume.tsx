@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getMasterLatexResume, saveMasterLatexResume } from "@/lib/resumeStore";
+import { masterResumeFingerprint } from "@/lib/masterResumeUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,18 +62,25 @@ export default function MasterResumePage() {
     }
     setSaving(true);
     try {
-      const resume: MasterLatexResume = {
-        latexCode,
-        title,
-        updatedAt: Date.now(),
-      };
-      await saveMasterLatexResume(user.uid, resume);
-      toast.success("Master resume saved!");
+      await persistMaster(latexCode, title);
+      const fp = masterResumeFingerprint(latexCode);
+      toast.success(`Master resume saved! (${fp.sectionCount} section(s))`);
     } catch (e: any) {
       toast.error(e.message || "Failed to save");
     } finally {
       setSaving(false);
     }
+  };
+
+  const persistMaster = async (content: string, resumeTitle: string) => {
+    if (!user?.uid) return false;
+    const resume: MasterLatexResume = {
+      latexCode: content,
+      title: resumeTitle,
+      updatedAt: Date.now(),
+    };
+    await saveMasterLatexResume(user.uid, resume);
+    return true;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,15 +91,31 @@ export default function MasterResumePage() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const content = ev.target?.result as string;
+      const resumeTitle = file.name.replace(/\.(tex|txt)$/, "");
       setLatexCode(content);
-      setTitle(file.name.replace(/\.(tex|txt)$/, ""));
-      toast.success(`Loaded ${file.name}`);
+      setTitle(resumeTitle);
+
+      let savedToFirestore = false;
+      try {
+        if (user?.uid) {
+          savedToFirestore = await persistMaster(content, resumeTitle);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to save to cloud");
+      }
+
+      const fp = masterResumeFingerprint(content);
+
+      if (savedToFirestore) {
+        toast.success(`Saved ${file.name} — ${fp.sectionCount} section(s) detected`);
+      } else {
+        toast.success(`Loaded ${file.name} — click Save to persist`);
+      }
     };
     reader.onerror = () => toast.error("Failed to read file");
     reader.readAsText(file);
-    // Reset input so the same file can be re-uploaded
     e.target.value = "";
   };
 
@@ -128,6 +152,7 @@ export default function MasterResumePage() {
   };
 
   const lineCount = latexCode ? latexCode.split("\n").length : 1;
+  const masterPreview = latexCode.trim() ? masterResumeFingerprint(latexCode) : null;
 
   if (loading) {
     return (
@@ -324,6 +349,21 @@ export default function MasterResumePage() {
           onChange={handleFileUpload}
           className="hidden"
         />
+
+        {masterPreview && (
+          <div className="hidden lg:block max-w-md shrink-0 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+            <p className="font-medium text-foreground mb-1">Active master preview</p>
+            <p>{masterPreview.len.toLocaleString()} chars · {masterPreview.sectionCount} section(s)</p>
+            {masterPreview.sections.length > 0 && (
+              <p className="mt-1 truncate" title={masterPreview.sections.join(", ")}>
+                {masterPreview.sections.join(" · ")}
+              </p>
+            )}
+            <p className="mt-1 font-mono truncate opacity-80" title={masterPreview.snippet}>
+              {masterPreview.snippet}…
+            </p>
+          </div>
+        )}
 
         {/* View mode toggle */}
         <div className="ml-auto hidden md:flex items-center gap-0.5 bg-muted rounded-md p-0.5">
