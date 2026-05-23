@@ -181,7 +181,7 @@ export default function Settings() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Model: Claude Sonnet 4.6 (<code className="text-[10px]">claude-sonnet-4-6</code>).
+              Model: Claude Sonnet 4.5 (<code className="text-[10px]">claude-sonnet-4-5-20250929</code>).
               Key is stored in Firestore, or set <code className="text-[10px]">VITE_ANTHROPIC_API_KEY</code> in{" "}
               <code className="text-[10px]">.env.local</code>
               {resolveAnthropicKey() ? " (env key detected)." : "."}

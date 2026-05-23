@@ -1,4 +1,4 @@
-import { ANTHROPIC_CONFIG } from "@/config/anthropic";
+import { ANTHROPIC_CONFIG, ANTHROPIC_MODEL_CHAIN } from "@/config/anthropic";
 import { isAnthropicApiKey, isGeminiApiKey } from "./anthropicKey";
 
 export function resolveAnthropicKey(userKey?: string): string {
@@ -29,12 +29,32 @@ interface AnthropicMessageResponse {
 }
 
 function parseAnthropicError(body: AnthropicErrorBody, status: number): string {
-  const msg = body.error?.message;
-  if (msg) return msg;
+  const msg = body.error?.message?.trim();
+  if (msg && msg !== "Error") return msg;
   if (status === 401) {
     return "Invalid API key. Create a new sk-ant-... key at console.anthropic.com and save it in Settings.";
   }
+  if (status === 400) {
+    return "Bad request — often an unsupported model for your API key. The app will try fallback models automatically.";
+  }
   return `HTTP ${status}`;
+}
+
+/** True when we should try the next model in the chain. */
+function shouldTryNextModel(status: number, body: AnthropicErrorBody): boolean {
+  if (status === 404) return true;
+  if (status !== 400) return false;
+  const type = body.error?.type ?? "";
+  const msg = (body.error?.message ?? "").toLowerCase();
+  if (type === "invalid_request_error" && (!msg || msg === "error")) {
+    return true;
+  }
+  return (
+    msg.includes("model") ||
+    msg.includes("identifier") ||
+    msg.includes("not found") ||
+    msg.includes("does not exist")
+  );
 }
 
 async function anthropicMessagesRequest(
@@ -85,10 +105,10 @@ export async function validateAnthropicKeyDetailed(apiKey: string): Promise<Vali
     };
   }
 
-  const models = [ANTHROPIC_CONFIG.MODEL, ...ANTHROPIC_CONFIG.FALLBACK_MODELS];
   let lastError = "Unknown error";
 
-  for (const model of models) {
+  for (let i = 0; i < ANTHROPIC_MODEL_CHAIN.length; i++) {
+    const model = ANTHROPIC_MODEL_CHAIN[i];
     try {
       const response = await anthropicMessagesRequest(key, model, "Reply with OK only.", undefined, 16);
       const body = (await response.json()) as AnthropicMessageResponse & AnthropicErrorBody;
@@ -97,11 +117,11 @@ export async function validateAnthropicKeyDetailed(apiKey: string): Promise<Vali
         return { valid: true };
       }
 
-      lastError = parseAnthropicError(body, response.status);
+      lastError = `${model}: ${parseAnthropicError(body, response.status)}`;
       if (response.status === 401 || response.status === 403) {
         return { valid: false, error: lastError };
       }
-      if (response.status === 404) {
+      if (shouldTryNextModel(response.status, body) && i < ANTHROPIC_MODEL_CHAIN.length - 1) {
         continue;
       }
       return { valid: false, error: lastError };
@@ -133,11 +153,10 @@ export async function callClaude(
     );
   }
 
-  const models = [ANTHROPIC_CONFIG.MODEL, ...ANTHROPIC_CONFIG.FALLBACK_MODELS];
   let lastError = "Anthropic request failed";
 
-  for (let i = 0; i < models.length; i++) {
-    const model = models[i];
+  for (let i = 0; i < ANTHROPIC_MODEL_CHAIN.length; i++) {
+    const model = ANTHROPIC_MODEL_CHAIN[i];
     const response = await anthropicMessagesRequest(key, model, prompt, system);
     const body = (await response.json()) as AnthropicMessageResponse & AnthropicErrorBody;
 
@@ -145,13 +164,14 @@ export async function callClaude(
       return body.content?.find((b) => b.type === "text")?.text ?? "";
     }
 
-    lastError = parseAnthropicError(body, response.status);
+    lastError = `${model}: ${parseAnthropicError(body, response.status)}`;
 
     if (response.status === 401 || response.status === 403) {
       throw new Error(`Anthropic API rejected the API key: ${lastError}`);
     }
 
-    if (response.status === 404 && i < models.length - 1) {
+    if (shouldTryNextModel(response.status, body) && i < ANTHROPIC_MODEL_CHAIN.length - 1) {
+      console.warn(`[Anthropic] ${model} failed (${response.status}), trying ${ANTHROPIC_MODEL_CHAIN[i + 1]}...`);
       continue;
     }
 
