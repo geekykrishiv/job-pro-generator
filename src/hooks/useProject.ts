@@ -8,7 +8,7 @@ import {
   saveResumeVersion
 } from "@/lib/resumeStore";
 import { runResumePipeline } from "@/lib/resumePipeline";
-import { resolveAnthropicKey } from "@/lib/claude";
+import { resolveGeminiKey } from "@/lib/geminiKey";
 import type {
   ResumeProject,
   MasterLatexResume,
@@ -64,7 +64,7 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
       ]);
       setProject(p);
       setMasterLatex(m);
-      setApiKey(s.anthropicKey ?? "");
+      setApiKey(s.geminiKey ?? "");
       setLoading(false);
     })();
   }, [user?.uid, projectId]);
@@ -80,8 +80,8 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
         return;
       }
 
-      if (!resolveAnthropicKey(apiKey)) {
-        toast.error("Add your Anthropic API key in Settings (or VITE_ANTHROPIC_API_KEY in .env.local).");
+      if (!resolveGeminiKey(apiKey)) {
+        toast.error("Add your Gemini API key in Settings (free tier at aistudio.google.com).");
         return;
       }
 
@@ -140,7 +140,7 @@ ${project.jobDescription}`;
         const result = await runResumePipeline({
           jd: jdText,
           masterResumeLatex: masterLatexCode,
-          apiKey,
+          apiKey: resolveGeminiKey(apiKey),
           onStepUpdate: (steps) => {
             setPipelineSteps([...steps]);
             const runningStep = steps.find(s => s.status === 'running');

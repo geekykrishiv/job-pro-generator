@@ -11,8 +11,10 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { MasterLatexResume, ResumeProject, ResumeVersion, ChatMessage, ATSScoreResult } from "@/types";
-import { validateAnthropicKeyDetailed } from "./claude";
-import { resolveStoredAnthropicKey } from "./anthropicKey";
+import { GoogleGenAI } from "@google/genai";
+import { GEMINI_MODEL_CHAIN } from "@/config/gemini";
+import { extractGeminiHttpStatus, isRetryableGeminiError } from "./gemini";
+import { isGeminiApiKey } from "./geminiKey";
 import { deleteField } from "firebase/firestore";
 
 function removeUndefined(obj: Record<string, unknown>): Record<string, unknown> {
@@ -27,24 +29,18 @@ const projectDoc = (uid: string, pid: string) => doc(db, "users", uid, "projects
 
 // ─── User Settings ──────────────────────────────────────────────────────
 
-export async function getUserSettings(uid: string): Promise<{
-  anthropicKey?: string;
-  hasLegacyGeminiKey: boolean;
-}> {
+export async function getUserSettings(uid: string): Promise<{ geminiKey?: string }> {
   const snap = await getDoc(userDoc(uid));
-  const resolved = resolveStoredAnthropicKey(snap.data());
-  return {
-    anthropicKey: resolved.anthropicKey,
-    hasLegacyGeminiKey: resolved.hasLegacyGeminiKey,
-  };
+  const gemini = snap.data()?.geminiKey?.trim();
+  return gemini && isGeminiApiKey(gemini) ? { geminiKey: gemini } : {};
 }
 
-export async function saveUserSettings(uid: string, settings: { anthropicKey?: string }) {
+export async function saveUserSettings(uid: string, settings: { geminiKey?: string }) {
   await setDoc(
     userDoc(uid),
     {
-      anthropicKey: settings.anthropicKey ?? null,
-      geminiKey: deleteField(),
+      geminiKey: settings.geminiKey ?? null,
+      anthropicKey: deleteField(),
     },
     { merge: true },
   );
@@ -184,9 +180,46 @@ export async function restoreResumeVersion(
 
 // ─── API Key Validation ─────────────────────────────────────────────────
 
-export async function validateAnthropicKey(apiKey: string): Promise<boolean> {
-  const result = await validateAnthropicKeyDetailed(apiKey);
-  return result.valid;
+export interface ValidateGeminiKeyResult {
+  valid: boolean;
+  error?: string;
 }
 
-export { validateAnthropicKeyDetailed };
+export async function validateGeminiKeyDetailed(apiKey: string): Promise<ValidateGeminiKeyResult> {
+  const key = apiKey.trim();
+  if (!key) return { valid: false, error: "No API key entered." };
+  if (!isGeminiApiKey(key)) {
+    return {
+      valid: false,
+      error: "Use a Google Gemini key (AIza...) from aistudio.google.com/apikey",
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey: key });
+  let lastError = "Unknown error";
+
+  for (let i = 0; i < GEMINI_MODEL_CHAIN.length; i++) {
+    const model = GEMINI_MODEL_CHAIN[i];
+    try {
+      await ai.models.generateContent({
+        model,
+        contents: "Reply with OK only.",
+      });
+      return { valid: true };
+    } catch (error: unknown) {
+      const status = extractGeminiHttpStatus(error);
+      lastError = error instanceof Error ? error.message : String(error);
+      if (status === 401 || status === 403) {
+        return { valid: false, error: "Invalid Gemini API key. Check AI Studio and try again." };
+      }
+      if (isRetryableGeminiError(error) && i < GEMINI_MODEL_CHAIN.length - 1) continue;
+      return { valid: false, error: lastError };
+    }
+  }
+
+  return { valid: false, error: lastError };
+}
+
+export async function validateGeminiKey(apiKey: string): Promise<boolean> {
+  return (await validateGeminiKeyDetailed(apiKey)).valid;
+}

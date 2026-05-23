@@ -49,11 +49,11 @@ export async function runResumePipeline({
   try {
     let currentLatex = '';
     try {
-      updateStep('generate', { status: 'running', detail: 'Calling Claude...' });
+      updateStep('generate', { status: 'running', detail: 'Calling Gemini...' });
       currentLatex = await generateResume(jd, masterResumeLatex, apiKey);
 
       if (!currentLatex || currentLatex.trim().length < 100) {
-        throw new Error('Claude returned empty or invalid LaTeX');
+        throw new Error('Gemini returned empty or invalid LaTeX');
       }
 
       updateStep('generate', { status: 'done', detail: 'Resume generated' });

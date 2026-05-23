@@ -3,10 +3,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getUserSettings,
   saveUserSettings,
-  validateAnthropicKeyDetailed,
+  validateGeminiKeyDetailed,
 } from "@/lib/resumeStore";
-import { resolveAnthropicKey } from "@/lib/claude";
-import { isAnthropicApiKey } from "@/lib/anthropicKey";
+import { resolveGeminiKey, isGeminiApiKey } from "@/lib/geminiKey";
+import { GEMINI_CONFIG } from "@/config/gemini";
 import { auth } from "@/lib/firebase";
 import { updateProfile, deleteUser } from "firebase/auth";
 import { Button } from "@/components/ui/button";
@@ -31,13 +31,7 @@ export default function Settings() {
     if (!user?.uid) return;
     setDisplayName(user.displayName ?? "");
     getUserSettings(user.uid).then((s) => {
-      setKey(s.anthropicKey ?? "");
-      if (s.hasLegacyGeminiKey) {
-        toast.error(
-          "Your saved key is a Google Gemini key (AIza...). Paste a new Anthropic key (sk-ant-...) and save.",
-          { duration: 8000 },
-        );
-      }
+      setKey(s.geminiKey ?? "");
       setLoading(false);
     });
   }, [user?.uid]);
@@ -47,7 +41,6 @@ export default function Settings() {
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
-  // Reset validation status when key changes
   useEffect(() => {
     setKeyValid(null);
   }, [key]);
@@ -59,16 +52,16 @@ export default function Settings() {
     }
     setValidating(true);
     try {
-      const result = await validateAnthropicKeyDetailed(key.trim());
+      const result = await validateGeminiKeyDetailed(key.trim());
       setKeyValid(result.valid);
       if (result.valid) {
-        toast.success("API key is valid!");
-        if (user?.uid && isAnthropicApiKey(key)) {
-          await saveUserSettings(user.uid, { anthropicKey: key.trim() });
+        toast.success("Gemini API key is valid!");
+        if (user?.uid && isGeminiApiKey(key)) {
+          await saveUserSettings(user.uid, { geminiKey: key.trim() });
           toast.success("Key saved to your account.");
         }
       } else {
-        toast.error(result.error ?? "Invalid API key. Check and try again.");
+        toast.error(result.error ?? "Invalid API key.");
       }
     } catch {
       setKeyValid(false);
@@ -81,11 +74,11 @@ export default function Settings() {
   const save = async () => {
     if (!user?.uid) return;
     const trimmed = key.trim();
-    if (trimmed && !isAnthropicApiKey(trimmed)) {
-      toast.error("Anthropic keys must start with sk-ant- (from console.anthropic.com).");
+    if (trimmed && !isGeminiApiKey(trimmed)) {
+      toast.error("Gemini keys start with AIza... (from aistudio.google.com/apikey).");
       return;
     }
-    await saveUserSettings(user.uid, { anthropicKey: trimmed });
+    await saveUserSettings(user.uid, { geminiKey: trimmed });
     if (displayName !== (user.displayName ?? "")) {
       await updateProfile(user, { displayName });
     }
@@ -98,8 +91,9 @@ export default function Settings() {
     try {
       await deleteUser(user);
       toast.success("Account deleted");
-    } catch (e: any) {
-      toast.error(e.message + " — you may need to sign in again first.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg + " — you may need to sign in again first.");
     }
   };
 
@@ -124,12 +118,12 @@ export default function Settings() {
         </Card>
 
         <Card className="p-6 space-y-4">
-          <h2 className="font-medium">Anthropic API Key</h2>
+          <h2 className="font-medium">Gemini API Key</h2>
           <div className="space-y-3">
             <div className="relative">
               <Input
                 type={showKey ? "text" : "password"}
-                placeholder="sk-ant-..."
+                placeholder="AIza..."
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 disabled={loading}
@@ -171,20 +165,27 @@ export default function Settings() {
                 )}
               </Button>
               <a
-                href="https://console.anthropic.com/settings/keys"
+                href="https://aistudio.google.com/apikey"
                 target="_blank"
                 rel="noreferrer"
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               >
-                Get a key <ExternalLink className="h-3 w-3" />
+                Get a free key <ExternalLink className="h-3 w-3" />
               </a>
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Model: Claude Sonnet 4.5 (<code className="text-[10px]">claude-sonnet-4-5-20250929</code>).
-              Key is stored in Firestore, or set <code className="text-[10px]">VITE_ANTHROPIC_API_KEY</code> in{" "}
+              Free tier available on Google AI Studio. Model:{" "}
+              <code className="text-[10px]">{GEMINI_CONFIG.PRIMARY_MODEL}</code>
+              {GEMINI_CONFIG.FALLBACK_MODELS.length > 0 && (
+                <>
+                  {" "}
+                  (fallback: <code className="text-[10px]">{GEMINI_CONFIG.FALLBACK_MODELS.join(", ")}</code>)
+                </>
+              )}
+              . Optional: <code className="text-[10px]">VITE_GEMINI_API_KEY</code> in{" "}
               <code className="text-[10px]">.env.local</code>
-              {resolveAnthropicKey() ? " (env key detected)." : "."}
+              {resolveGeminiKey() ? " (env key detected)." : "."}
             </p>
           </div>
         </Card>

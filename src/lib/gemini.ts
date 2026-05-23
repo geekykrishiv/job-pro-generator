@@ -54,6 +54,7 @@ export async function callGemini(
   apiKey: string,
   prompt: string,
   system?: string,
+  configOverride?: Partial<typeof GEMINI_CONFIG.DEFAULT_CONFIG>,
 ): Promise<string> {
   if (!apiKey) throw new Error("Missing Gemini API key. Add it in Settings.");
 
@@ -71,6 +72,7 @@ export async function callGemini(
         contents: prompt,
         config: {
           ...GEMINI_CONFIG.DEFAULT_CONFIG,
+          ...configOverride,
           ...(system ? { systemInstruction: system } : {}),
         },
       });

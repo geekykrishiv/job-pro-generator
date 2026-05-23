@@ -1,4 +1,5 @@
-import { callClaude } from "./claude";
+import { callGemini } from "./gemini";
+import { GEMINI_CONFIG } from "@/config/gemini";
 import { extractKeywords, scoreResumeMatch } from "./atsAnalyzer";
 import type { ATSKeywordResult, ResumeMatchScore } from "@/types";
 
@@ -117,7 +118,7 @@ export async function generateTailoredResume({
   additionalInstructions,
   apiKey,
 }: TailorInput): Promise<TailorResult> {
-  if (!apiKey) throw new Error("Missing Anthropic API key. Add it in Settings.");
+  if (!apiKey) throw new Error("Missing Gemini API key. Add it in Settings.");
   if (!masterResumeLatex.trim()) throw new Error("No master resume found. Upload your LaTeX resume first.");
   if (!jobDescription.trim()) throw new Error("Job description is empty.");
 
@@ -135,7 +136,7 @@ export async function generateTailoredResume({
   });
 
   // Step 3: Call Gemini
-  const raw = await callClaude(apiKey, prompt, TAILORING_SYSTEM_PROMPT);
+  const raw = await callGemini(apiKey, prompt, TAILORING_SYSTEM_PROMPT, GEMINI_CONFIG.GENERATION_CONFIG);
 
   // Step 4: Extract and validate LaTeX
   let latex = extractLatexCode(raw);
@@ -145,7 +146,12 @@ export async function generateTailoredResume({
     // If validation fails, try one more time with a fix-up prompt
     console.warn("LaTeX validation failed:", validation.error, "— attempting fix");
     const fixPrompt = `The following LaTeX code has an error: ${validation.error}. Fix it and return ONLY valid LaTeX:\n\n${latex}`;
-    const fixRaw = await callClaude(apiKey, fixPrompt, "Fix the LaTeX code. Return ONLY valid LaTeX starting with \\documentclass and ending with \\end{document}.");
+    const fixRaw = await callGemini(
+      apiKey,
+      fixPrompt,
+      "Fix the LaTeX code. Return ONLY valid LaTeX starting with \\documentclass and ending with \\end{document}.",
+      GEMINI_CONFIG.GENERATION_CONFIG,
+    );
     latex = extractLatexCode(fixRaw);
   }
 
@@ -208,6 +214,6 @@ export async function refineTailoredResume(
   userRequest: string,
 ): Promise<string> {
   const prompt = `CURRENT TAILORED RESUME (LaTeX):\n${currentLatex}\n\nORIGINAL MASTER RESUME (LaTeX):\n${masterResumeLatex}\n\nJOB DESCRIPTION:\n${jobDescription}\n\nUSER REQUEST:\n${userRequest}\n\nApply the requested changes. Return ONLY valid LaTeX.`;
-  const raw = await callClaude(apiKey, prompt, REFINE_SYSTEM_PROMPT);
+  const raw = await callGemini(apiKey, prompt, REFINE_SYSTEM_PROMPT, GEMINI_CONFIG.GENERATION_CONFIG);
   return extractLatexCode(raw);
 }
