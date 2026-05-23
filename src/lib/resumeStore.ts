@@ -11,9 +11,9 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { MasterLatexResume, ResumeProject, ResumeVersion, ChatMessage, ATSScoreResult } from "@/types";
-import { ANTHROPIC_CONFIG } from "@/config/anthropic";
-import { resolveAnthropicKey } from "./claude";
-import { deleteField } from 'firebase/firestore';
+import { validateAnthropicKeyDetailed } from "./claude";
+import { resolveStoredAnthropicKey } from "./anthropicKey";
+import { deleteField } from "firebase/firestore";
 
 function removeUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(JSON.stringify(obj, (_, v) => v === undefined ? null : v));
@@ -27,17 +27,27 @@ const projectDoc = (uid: string, pid: string) => doc(db, "users", uid, "projects
 
 // ─── User Settings ──────────────────────────────────────────────────────
 
-export async function getUserSettings(uid: string): Promise<{ anthropicKey?: string; geminiKey?: string }> {
+export async function getUserSettings(uid: string): Promise<{
+  anthropicKey?: string;
+  hasLegacyGeminiKey: boolean;
+}> {
   const snap = await getDoc(userDoc(uid));
-  const data = snap.data();
+  const resolved = resolveStoredAnthropicKey(snap.data());
   return {
-    anthropicKey: data?.anthropicKey ?? data?.geminiKey,
-    geminiKey: data?.geminiKey,
+    anthropicKey: resolved.anthropicKey,
+    hasLegacyGeminiKey: resolved.hasLegacyGeminiKey,
   };
 }
 
 export async function saveUserSettings(uid: string, settings: { anthropicKey?: string }) {
-  await setDoc(userDoc(uid), removeUndefined({ anthropicKey: settings.anthropicKey }), { merge: true });
+  await setDoc(
+    userDoc(uid),
+    {
+      anthropicKey: settings.anthropicKey ?? null,
+      geminiKey: deleteField(),
+    },
+    { merge: true },
+  );
 }
 
 // ─── Master LaTeX Resume ────────────────────────────────────────────────
@@ -175,30 +185,8 @@ export async function restoreResumeVersion(
 // ─── API Key Validation ─────────────────────────────────────────────────
 
 export async function validateAnthropicKey(apiKey: string): Promise<boolean> {
-  const key = resolveAnthropicKey(apiKey);
-  if (!key) return false;
-
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": ANTHROPIC_CONFIG.API_VERSION,
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_CONFIG.MODEL,
-        max_tokens: 16,
-        messages: [{ role: "user", content: "Reply with OK only." }],
-      }),
-    });
-    if (response.status === 401 || response.status === 403) return false;
-    return response.ok;
-  } catch {
-    return false;
-  }
+  const result = await validateAnthropicKeyDetailed(apiKey);
+  return result.valid;
 }
 
-/** @deprecated Use validateAnthropicKey */
-export const validateGeminiKey = validateAnthropicKey;
+export { validateAnthropicKeyDetailed };

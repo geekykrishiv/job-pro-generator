@@ -64,7 +64,7 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
       ]);
       setProject(p);
       setMasterLatex(m);
-      setApiKey(s.anthropicKey ?? s.geminiKey ?? "");
+      setApiKey(s.anthropicKey ?? "");
       setLoading(false);
     })();
   }, [user?.uid, projectId]);

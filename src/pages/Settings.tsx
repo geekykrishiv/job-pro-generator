@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserSettings, saveUserSettings, validateAnthropicKey } from "@/lib/resumeStore";
+import {
+  getUserSettings,
+  saveUserSettings,
+  validateAnthropicKeyDetailed,
+} from "@/lib/resumeStore";
 import { resolveAnthropicKey } from "@/lib/claude";
+import { isAnthropicApiKey } from "@/lib/anthropicKey";
 import { auth } from "@/lib/firebase";
 import { updateProfile, deleteUser } from "firebase/auth";
 import { Button } from "@/components/ui/button";
@@ -26,7 +31,13 @@ export default function Settings() {
     if (!user?.uid) return;
     setDisplayName(user.displayName ?? "");
     getUserSettings(user.uid).then((s) => {
-      setKey(s.anthropicKey ?? s.geminiKey ?? "");
+      setKey(s.anthropicKey ?? "");
+      if (s.hasLegacyGeminiKey) {
+        toast.error(
+          "Your saved key is a Google Gemini key (AIza...). Paste a new Anthropic key (sk-ant-...) and save.",
+          { duration: 8000 },
+        );
+      }
       setLoading(false);
     });
   }, [user?.uid]);
@@ -48,12 +59,16 @@ export default function Settings() {
     }
     setValidating(true);
     try {
-      const valid = await validateAnthropicKey(key.trim());
-      setKeyValid(valid);
-      if (valid) {
+      const result = await validateAnthropicKeyDetailed(key.trim());
+      setKeyValid(result.valid);
+      if (result.valid) {
         toast.success("API key is valid!");
+        if (user?.uid && isAnthropicApiKey(key)) {
+          await saveUserSettings(user.uid, { anthropicKey: key.trim() });
+          toast.success("Key saved to your account.");
+        }
       } else {
-        toast.error("Invalid API key. Check and try again.");
+        toast.error(result.error ?? "Invalid API key. Check and try again.");
       }
     } catch {
       setKeyValid(false);
@@ -65,7 +80,12 @@ export default function Settings() {
 
   const save = async () => {
     if (!user?.uid) return;
-    await saveUserSettings(user.uid, { anthropicKey: key.trim() });
+    const trimmed = key.trim();
+    if (trimmed && !isAnthropicApiKey(trimmed)) {
+      toast.error("Anthropic keys must start with sk-ant- (from console.anthropic.com).");
+      return;
+    }
+    await saveUserSettings(user.uid, { anthropicKey: trimmed });
     if (displayName !== (user.displayName ?? "")) {
       await updateProfile(user, { displayName });
     }
@@ -161,7 +181,7 @@ export default function Settings() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Model: Claude Sonnet 4 (<code className="text-[10px]">claude-sonnet-4-20250514</code>).
+              Model: Claude Sonnet 4.6 (<code className="text-[10px]">claude-sonnet-4-6</code>).
               Key is stored in Firestore, or set <code className="text-[10px]">VITE_ANTHROPIC_API_KEY</code> in{" "}
               <code className="text-[10px]">.env.local</code>
               {resolveAnthropicKey() ? " (env key detected)." : "."}
