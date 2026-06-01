@@ -2,7 +2,13 @@ import type { GenerationConfig } from "@google/generative-ai";
 
 export const GEMINI_CONFIG = {
   PRIMARY_MODEL: "gemini-2.5-flash",
-  FALLBACK_MODELS: ["gemini-2.5-pro", "gemini-2.0-flash"] as const,
+  /** Tried in order when primary is overloaded (503) or rate-limited. */
+  FALLBACK_MODELS: [
+    "gemini-2.0-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+  ] as const,
 
   /** Resume generation — low temperature per AI Studio best practice. */
   GENERATION_CONFIG: {

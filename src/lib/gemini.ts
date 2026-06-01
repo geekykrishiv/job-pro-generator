@@ -20,9 +20,15 @@ export function extractGeminiHttpStatus(error: unknown): number | undefined {
     /* not JSON */
   }
 
+  const bracketStatus = msg.match(/\[(\d{3})\s*\]/);
+  if (bracketStatus) return parseInt(bracketStatus[1], 10);
+
   const quoted = msg.match(/"code"\s*:\s*(\d{3})/);
   if (quoted) return parseInt(quoted[1], 10);
-  if (/\b429\b/.test(msg)) return 429;
+
+  for (const code of [503, 429, 502, 500, 529, 404]) {
+    if (new RegExp(`\\b${code}\\b`).test(msg)) return code;
+  }
   if (/not\s+found|is\s+not\s+found/i.test(msg)) return 404;
   return undefined;
 }
@@ -30,9 +36,14 @@ export function extractGeminiHttpStatus(error: unknown): number | undefined {
 export function isRetryableGeminiError(error: unknown): boolean {
   const status = extractGeminiHttpStatus(error);
   if (status === 401 || status === 403) return false;
-  if (status === 404 || status === 429) return true;
+  if (status === 404 || status === 429 || status === 500 || status === 502 || status === 503 || status === 529) {
+    return true;
+  }
   const msg = error instanceof Error ? error.message : String(error);
   if (/RESOURCE_EXHAUSTED|quota|rate\s*limit/i.test(msg)) return true;
+  if (/high demand|overloaded|temporarily unavailable|try again later|UNAVAILABLE/i.test(msg)) {
+    return true;
+  }
   if (/not\s+found|is\s+not\s+found/i.test(msg)) return true;
   return false;
 }
@@ -88,16 +99,21 @@ export async function callGemini(
         );
       }
 
-      if (!isRetryableGeminiError(error)) {
+      const retryable = isRetryableGeminiError(error);
+
+      if (!retryable) {
         throw new Error(formatGeminiFailure(chain.slice(0, i + 1), error));
       }
 
       if (i < chain.length - 1) {
-        console.warn(`[Gemini] ${modelName} failed. Trying ${chain[i + 1]}...`);
+        const reason = status ?? "retryable";
+        console.warn(`[Gemini] ${modelName} failed (${reason}). Trying ${chain[i + 1]}...`);
         continue;
       }
 
-      throw new Error(formatGeminiFailure(chain, error));
+      throw new Error(
+        `${formatGeminiFailure(chain, error)} If a model was overloaded (503), wait a minute and try again.`,
+      );
     }
   }
 
