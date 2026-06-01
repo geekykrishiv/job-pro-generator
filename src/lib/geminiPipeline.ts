@@ -136,7 +136,8 @@ export async function generateTailoredResume({
   });
 
   // Step 3: Call Gemini
-  const raw = await callGemini(apiKey, prompt, TAILORING_SYSTEM_PROMPT, GEMINI_CONFIG.GENERATION_CONFIG);
+  const fullPrompt = `${TAILORING_SYSTEM_PROMPT}\n\n${prompt}`;
+  const raw = await callGemini(apiKey, fullPrompt, GEMINI_CONFIG.GENERATION_CONFIG);
 
   // Step 4: Extract and validate LaTeX
   let latex = extractLatexCode(raw);
@@ -148,8 +149,7 @@ export async function generateTailoredResume({
     const fixPrompt = `The following LaTeX code has an error: ${validation.error}. Fix it and return ONLY valid LaTeX:\n\n${latex}`;
     const fixRaw = await callGemini(
       apiKey,
-      fixPrompt,
-      "Fix the LaTeX code. Return ONLY valid LaTeX starting with \\documentclass and ending with \\end{document}.",
+      `Fix the LaTeX code. Return ONLY valid LaTeX starting with \\documentclass and ending with \\end{document}.\n\n${fixPrompt}`,
       GEMINI_CONFIG.GENERATION_CONFIG,
     );
     latex = extractLatexCode(fixRaw);
@@ -214,6 +214,6 @@ export async function refineTailoredResume(
   userRequest: string,
 ): Promise<string> {
   const prompt = `CURRENT TAILORED RESUME (LaTeX):\n${currentLatex}\n\nORIGINAL MASTER RESUME (LaTeX):\n${masterResumeLatex}\n\nJOB DESCRIPTION:\n${jobDescription}\n\nUSER REQUEST:\n${userRequest}\n\nApply the requested changes. Return ONLY valid LaTeX.`;
-  const raw = await callGemini(apiKey, prompt, REFINE_SYSTEM_PROMPT, GEMINI_CONFIG.GENERATION_CONFIG);
+  const raw = await callGemini(apiKey, `${REFINE_SYSTEM_PROMPT}\n\n${prompt}`, GEMINI_CONFIG.GENERATION_CONFIG);
   return extractLatexCode(raw);
 }

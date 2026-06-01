@@ -11,9 +11,8 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { MasterLatexResume, ResumeProject, ResumeVersion, ChatMessage, ATSScoreResult } from "@/types";
-import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL_CHAIN } from "@/config/gemini";
-import { extractGeminiHttpStatus, isRetryableGeminiError } from "./gemini";
+import { extractGeminiHttpStatus, generateGeminiText, isRetryableGeminiError } from "./gemini";
 import { isGeminiApiKey } from "./geminiKey";
 import { deleteField } from "firebase/firestore";
 
@@ -195,16 +194,12 @@ export async function validateGeminiKeyDetailed(apiKey: string): Promise<Validat
     };
   }
 
-  const ai = new GoogleGenAI({ apiKey: key });
   let lastError = "Unknown error";
 
   for (let i = 0; i < GEMINI_MODEL_CHAIN.length; i++) {
     const model = GEMINI_MODEL_CHAIN[i];
     try {
-      await ai.models.generateContent({
-        model,
-        contents: "Reply with OK only.",
-      });
+      await generateGeminiText(key, model, "Reply with OK only.", { maxOutputTokens: 16 });
       return { valid: true };
     } catch (error: unknown) {
       const status = extractGeminiHttpStatus(error);

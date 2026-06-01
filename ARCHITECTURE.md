@@ -17,7 +17,7 @@ Unlike a traditional web app with a standalone Node.js backend, this project lev
 - **Frontend Framework:** React 18, TypeScript, Vite
 - **Styling:** Tailwind CSS, `shadcn/ui` (Radix UI components)
 - **Database & Auth:** Firebase (Authentication, Firestore)
-- **AI Integration:** Google GenAI JS SDK (`@google/genai`)
+- **AI Integration:** Google AI Studio SDK (`@google/generative-ai`, Gemini 2.5 Flash)
 - **PDF Generation:** MiKTeX (`pdflatex` CLI binary)
 - **State Management:** React Context API (`AuthContext`)
 
@@ -55,7 +55,7 @@ job-pro-generator/
 ### A. The AI Tailoring Workflow
 1.  **Input:** The user uploads a Master Resume (`masterLatexResume` in Firestore) and a Job Description.
 2.  **Prompting:** `src/components/project/ProjectChat.tsx` constructs a system prompt containing the Master Resume and Job Description.
-3.  **Inference:** `src/lib/gemini.ts` calls the Gemini API via the `@google/genai` SDK.
+3.  **Inference:** `src/lib/gemini.ts` calls Gemini via `@google/generative-ai` with master resume from Firestore.
     - If `gemini-2.0-flash` returns a `429 Quota Exceeded` error, the system automatically catches the error and retries with `gemini-1.5-flash` to prevent UI crashes.
 4.  **Parsing:** The AI returns optimized LaTeX code, which is saved as a new version in Firestore.
 

@@ -1,12 +1,10 @@
 import { callGemini } from "./gemini";
 import { GEMINI_CONFIG } from "@/config/gemini";
 import {
-  buildGenerateUserPrompt,
-  buildRewriteUserPrompt,
-  FIX_LATEX_SYSTEM,
-  GENERATE_SYSTEM,
-  REWRITE_SYSTEM,
-  SCORE_SYSTEM,
+  buildFixLatexPrompt,
+  buildRewriteResumePrompt,
+  buildScoreResumePrompt,
+  buildTailoredResumePrompt,
 } from "./resumePrompts";
 import type { ATSScoreResult } from "@/types";
 
@@ -22,13 +20,8 @@ export async function generateResume(
   masterResumeLatex: string,
   geminiKey: string,
 ): Promise<string> {
-  const prompt = buildGenerateUserPrompt(jd, masterResumeLatex);
-  const rawResult = await callGemini(
-    geminiKey,
-    prompt,
-    GENERATE_SYSTEM,
-    GEMINI_CONFIG.GENERATION_CONFIG,
-  );
+  const prompt = buildTailoredResumePrompt(jd, masterResumeLatex);
+  const rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.GENERATION_CONFIG);
   return cleanLatex(rawResult);
 }
 
@@ -37,31 +30,10 @@ export async function scoreResume(
   jd: string,
   geminiKey: string,
 ): Promise<ATSScoreResult> {
-  const prompt = `Score this resume 0–100 against the job description.
-
-Rubric (max points):
-- keyword_match (40): required JD terms appear in resume
-- skills_alignment (25): hard skills / stack overlap
-- action_verbs (15): strong verbs and impact language
-- structure (10): clear ATS-friendly sections
-- project_relevance (10): projects match the role
-
-Return ONLY this JSON (no markdown):
-{"score":0,"keyword_match":0,"skills_alignment":0,"action_verbs":0,"structure":0,"project_relevance":0,"missing_keywords":[],"improvements":[]}
-
-JOB DESCRIPTION:
-${jd}
-
-RESUME (LaTeX):
-${latex}`;
+  const prompt = buildScoreResumePrompt(jd, latex);
 
   try {
-    const rawResult = await callGemini(
-      geminiKey,
-      prompt,
-      SCORE_SYSTEM,
-      GEMINI_CONFIG.SCORING_CONFIG,
-    );
+    const rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.SCORING_CONFIG);
     const cleaned = rawResult.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
     const parsed = JSON.parse(cleaned) as ATSScoreResult;
     return {
@@ -96,30 +68,13 @@ export async function rewriteResume(
   masterResumeLatex: string,
   geminiKey: string,
 ): Promise<string> {
-  const prompt = buildRewriteUserPrompt(jd, masterResumeLatex, latex, scoreData);
-  const rawResult = await callGemini(
-    geminiKey,
-    prompt,
-    REWRITE_SYSTEM,
-    GEMINI_CONFIG.GENERATION_CONFIG,
-  );
+  const prompt = buildRewriteResumePrompt(jd, masterResumeLatex, latex, scoreData);
+  const rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.GENERATION_CONFIG);
   return cleanLatex(rawResult);
 }
 
 export async function fixLatex(latex: string, errorLog: string, geminiKey: string): Promise<string> {
-  const prompt = `COMPILER ERROR LOG:
-${errorLog}
-
-BROKEN LATEX:
-${latex}
-
-Return the fixed full LaTeX document.`;
-
-  const rawResult = await callGemini(
-    geminiKey,
-    prompt,
-    FIX_LATEX_SYSTEM,
-    GEMINI_CONFIG.GENERATION_CONFIG,
-  );
+  const prompt = buildFixLatexPrompt(latex, errorLog);
+  const rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.GENERATION_CONFIG);
   return cleanLatex(rawResult);
 }

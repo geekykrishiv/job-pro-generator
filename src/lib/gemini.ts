@@ -1,5 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI, type GenerationConfig } from "@google/generative-ai";
 import { GEMINI_CONFIG, GEMINI_MODEL_CHAIN } from "@/config/gemini";
+import { resolveGeminiKey } from "./geminiKey";
 
 /** HTTP-style status from SDK errors, including JSON bodies embedded in `message`. */
 export function extractGeminiHttpStatus(error: unknown): number | undefined {
@@ -8,11 +9,6 @@ export function extractGeminiHttpStatus(error: unknown): number | undefined {
     if (typeof e.status === "number") return e.status;
     const code = e.code;
     if (typeof code === "number" && code >= 400 && code < 600) return code;
-    const nested = e.error;
-    if (nested && typeof nested === "object") {
-      const c = (nested as Record<string, unknown>).code;
-      if (typeof c === "number") return c;
-    }
   }
 
   const msg = error instanceof Error ? error.message : String(error);
@@ -31,7 +27,6 @@ export function extractGeminiHttpStatus(error: unknown): number | undefined {
   return undefined;
 }
 
-/** Whether we should try the next model in the chain (not used for auth failures). */
 export function isRetryableGeminiError(error: unknown): boolean {
   const status = extractGeminiHttpStatus(error);
   if (status === 401 || status === 403) return false;
@@ -47,44 +42,49 @@ function formatGeminiFailure(modelsTried: readonly string[], error: unknown): st
   return `Gemini request failed after trying: ${modelsTried.join(", ")}. Last error: ${detail}`;
 }
 
+export async function generateGeminiText(
+  apiKey: string,
+  modelName: string,
+  prompt: string,
+  generationConfig?: GenerationConfig,
+): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig,
+  });
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
+
 /**
- * Calls the Gemini API using the official SDK, walking GEMINI_MODEL_CHAIN on retryable errors.
+ * Calls Google AI Studio (Gemini) with a single combined prompt string.
+ * Tries PRIMARY_MODEL then fallbacks on retryable errors.
  */
 export async function callGemini(
-  apiKey: string,
+  userApiKey: string,
   prompt: string,
-  system?: string,
-  configOverride?: Partial<typeof GEMINI_CONFIG.DEFAULT_CONFIG>,
+  generationConfig: GenerationConfig = GEMINI_CONFIG.GENERATION_CONFIG,
 ): Promise<string> {
-  if (!apiKey) throw new Error("Missing Gemini API key. Add it in Settings.");
-
-  const ai = new GoogleGenAI({ apiKey });
-  const chain = GEMINI_MODEL_CHAIN;
-  if (chain.length === 0) {
-    throw new Error("No Gemini models configured.");
+  const apiKey = resolveGeminiKey(userApiKey);
+  if (!apiKey) {
+    throw new Error(
+      "Missing Gemini API key. Add GEMINI_API_KEY in .env.local or save your key in Settings.",
+    );
   }
 
+  const chain = GEMINI_MODEL_CHAIN;
   for (let i = 0; i < chain.length; i++) {
-    const model = chain[i];
+    const modelName = chain[i];
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          ...GEMINI_CONFIG.DEFAULT_CONFIG,
-          ...configOverride,
-          ...(system ? { systemInstruction: system } : {}),
-        },
-      });
-
-      return response.text ?? "";
+      return await generateGeminiText(apiKey, modelName, prompt, generationConfig);
     } catch (error: unknown) {
-      console.error(`[Gemini] Error with model ${model}:`, error);
+      console.error(`[Gemini] Error with model ${modelName}:`, error);
 
       const status = extractGeminiHttpStatus(error);
       if (status === 401 || status === 403) {
         throw new Error(
-          `Gemini API rejected the API key (${status}). Check your key in Settings.`,
+          `Gemini API rejected the API key (${status}). Get a free key at aistudio.google.com/apikey`,
         );
       }
 
@@ -93,11 +93,13 @@ export async function callGemini(
       }
 
       if (i < chain.length - 1) {
-        console.warn(`[Gemini] ${model} failed (${status ?? "retryable"}). Trying ${chain[i + 1]}...`);
+        console.warn(`[Gemini] ${modelName} failed. Trying ${chain[i + 1]}...`);
         continue;
       }
 
       throw new Error(formatGeminiFailure(chain, error));
     }
   }
+
+  throw new Error("No Gemini models configured.");
 }

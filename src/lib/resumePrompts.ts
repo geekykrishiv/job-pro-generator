@@ -1,80 +1,70 @@
 import { LATEX_PREAMBLE } from "@/config/latexTemplate";
 
-export const LATEX_RULES = `
-LATEX RULES (strict):
-- Output ONLY raw LaTeX from \\documentclass through \\end{document} — no markdown fences, no commentary
-- Use this exact preamble (do not omit packages/macros from it):
+const LATEX_STRUCTURE_RULES = `
+- Use this exact preamble in your output:
 ${LATEX_PREAMBLE}
 - Every \\resumeSubheading has exactly 4 arguments in 4 separate {}
-- Every \\begin{X} has a matching \\end{X}
-- Escape: & → \\&, % → \\%, _ → \\_, # → \\#
-- \\href{url}{\\underline{text}} for links
-- Never nest \\resumeSubheading inside \\resumeItemListStart
-- Close \\resumeItemListEnd before each new \\resumeSubheading
-- Each bullet is one complete sentence, max 115 characters, never truncated
-- Right-column labels in \\resumeSubheading (args #2 and #4): max 22 characters (e.g. "Personal Project" not "Current Personal Project")
-- Keep the resume to ONE page
+- Escape special characters: & → \\&, % → \\%, _ → \\_, # → \\#
+- Keep the resume to ONE page; each bullet max 115 characters
 `.trim();
 
-export const GENERATE_SYSTEM = `You are a senior technical recruiter and LaTeX resume engineer.
+/** Single combined prompt for Gemini (no separate system role). */
+export function buildTailoredResumePrompt(
+  jobDescription: string,
+  masterResumeContent: string,
+): string {
+  return `
+You are an expert resume writer. Your job is to tailor a LaTeX resume to a job description.
 
-Your job: produce a single ATS-optimized, one-page LaTeX resume tailored to a job description.
+RULES:
+- Return ONLY valid LaTeX code. No explanation, no markdown, no preamble text before \\documentclass.
+- Start with \\documentclass and end with \\end{document}
+- Keep ALL formatting, LaTeX commands, and structure from the master resume
+- Only reorder, emphasize, or trim content to match the job description
+- Do NOT invent new experience, skills, or projects
+- Do NOT include any project or experience not present in the master resume below
+- Do NOT change contact info, education dates, or company names
+${LATEX_STRUCTURE_RULES}
 
-NON-NEGOTIABLE RULES:
-1. The MASTER RESUME (LaTeX) is the ONLY source of facts — names, dates, companies, projects, skills, achievements
-2. NEVER invent employers, projects, degrees, metrics, or tools not present in the master resume
-3. NEVER include a project or bullet that does not exist in the master resume
-4. You MAY reorder, reword, emphasize, or omit items for relevance to the job description
-5. Prefer strong action verbs and measurable outcomes already stated in the master resume
-6. Mirror important keywords from the job description when they honestly apply to existing experience
-
-SECTION ORDER:
-Heading → Summary (2–3 tailored sentences) → Education → Skills (technical only, no soft-skills row) → Projects → Achievements → Positions of Responsibility (only if present in master)
-
-PROJECT SELECTION:
-- Include the most job-relevant projects from the master resume (typically 3–4)
-- Lead with the strongest match for the role
-- Drop low-relevance projects rather than fabricating new ones`;
-
-export const REWRITE_SYSTEM = `You are a senior ATS resume editor and LaTeX specialist.
-
-Improve the CURRENT RESUME to raise its ATS score while obeying the MASTER RESUME as the only factual source.
-
-Rules:
-- Do not add projects, employers, or skills absent from the master resume
-- Incorporate missing keywords naturally into existing bullets
-- Fix LaTeX issues while rewriting
-- Keep one page and complete bullets`;
-
-export const SCORE_SYSTEM = `You are an ATS scoring engine. Return ONLY valid JSON matching the requested schema. No markdown.`;
-
-export const FIX_LATEX_SYSTEM = `You are a LaTeX expert. Fix compilation errors only. Do not change resume facts or remove sections. Output only valid LaTeX.`;
-
-export function buildGenerateUserPrompt(jd: string, masterResumeLatex: string): string {
-  return `${LATEX_RULES}
-
-MASTER RESUME (LaTeX — sole source of truth; do not add content outside this):
-${masterResumeLatex}
+MASTER RESUME (source of truth — use ONLY what is here):
+---
+${masterResumeContent}
+---
 
 JOB DESCRIPTION:
-${jd}
+---
+${jobDescription}
+---
 
-Task: Generate the tailored resume LaTeX now.`;
+Now return the tailored LaTeX resume:
+`.trim();
 }
 
-export function buildRewriteUserPrompt(
-  jd: string,
-  masterResumeLatex: string,
+export function buildRewriteResumePrompt(
+  jobDescription: string,
+  masterResumeContent: string,
   currentLatex: string,
   scoreData: { score: number; missing_keywords: string[]; improvements: string[] },
 ): string {
-  return `${LATEX_RULES}
+  return `
+You are an expert ATS resume editor. Improve the CURRENT RESUME LaTeX to score higher on the job description.
 
-MASTER RESUME (facts must match this):
-${masterResumeLatex}
+RULES:
+- Return ONLY valid LaTeX from \\documentclass through \\end{document}
+- The MASTER RESUME is the only source of facts — do not add projects, employers, or skills not listed there
+- Incorporate missing keywords naturally into existing bullets
+- Do not invent experience
+${LATEX_STRUCTURE_RULES}
+
+MASTER RESUME (source of truth):
+---
+${masterResumeContent}
+---
 
 CURRENT RESUME (improve this):
+---
 ${currentLatex}
+---
 
 ATS FEEDBACK:
 - Score: ${scoreData.score}/100
@@ -83,7 +73,58 @@ ATS FEEDBACK:
 ${scoreData.improvements.map((i) => `  - ${i}`).join("\n") || "  - none"}
 
 JOB DESCRIPTION:
-${jd}
+---
+${jobDescription}
+---
 
-Task: Return the improved full LaTeX resume.`;
+Return the improved full LaTeX resume:
+`.trim();
+}
+
+export function buildScoreResumePrompt(jobDescription: string, latex: string): string {
+  return `
+You are an ATS scoring engine. Score this resume 0–100 against the job description.
+
+Rubric:
+- keyword_match (max 40): JD keywords in resume
+- skills_alignment (max 25): required skills covered
+- action_verbs (max 15): strong verbs and measurable impact
+- structure (max 10): clean ATS-readable sections
+- project_relevance (max 10): projects match role
+
+Return ONLY valid JSON, no markdown:
+{"score":0,"keyword_match":0,"skills_alignment":0,"action_verbs":0,"structure":0,"project_relevance":0,"missing_keywords":[],"improvements":[]}
+
+JOB DESCRIPTION:
+---
+${jobDescription}
+---
+
+RESUME (LaTeX):
+---
+${latex}
+---
+`.trim();
+}
+
+export function buildFixLatexPrompt(latex: string, errorLog: string): string {
+  return `
+You are a LaTeX expert. Fix ALL compilation errors. Do not change resume facts.
+
+RULES:
+- Return ONLY fixed LaTeX from \\documentclass through \\end{document}
+- No markdown fences or explanation
+
+COMPILER ERROR LOG:
+---
+${errorLog}
+---
+
+BROKEN LATEX:
+---
+${latex}
+---
+
+Fixed LaTeX:
+`.trim();
 }

@@ -183,7 +183,7 @@ export default function Settings() {
                   (fallback: <code className="text-[10px]">{GEMINI_CONFIG.FALLBACK_MODELS.join(", ")}</code>)
                 </>
               )}
-              . Optional: <code className="text-[10px]">VITE_GEMINI_API_KEY</code> in{" "}
+              . Optional: <code className="text-[10px]">GEMINI_API_KEY</code> in{" "}
               <code className="text-[10px]">.env.local</code>
               {resolveGeminiKey() ? " (env key detected)." : "."}
             </p>

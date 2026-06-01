@@ -7,6 +7,7 @@ import latexCompileDevProxy from "./vite-plugin-latex-compile";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  envPrefix: ["VITE_", "GEMINI_"],
   server: {
     host: "::",
     port: 8080,
