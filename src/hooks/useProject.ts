@@ -37,6 +37,7 @@ interface UseProjectReturn {
   restoreVersion: (versionId: string) => void;
   deleteVersion: (versionId: string) => Promise<void>;
   updateLatex: (latex: string) => void;
+  clearChat: () => Promise<void>;
   setProject: React.Dispatch<React.SetStateAction<ResumeProject | null>>;
 }
 
@@ -356,6 +357,29 @@ ${project.jobDescription}`;
     [project],
   );
 
+  // Clear chat history
+  const clearChat = useCallback(
+    async () => {
+      if (!user?.uid || !project) return;
+      const updated = {
+        ...project,
+        chatHistory: [],
+        jobDescription: "",
+      };
+      setProject(updated);
+      setPipelineSteps([]);
+      setAtsScore(null);
+      setBestScore(0);
+      setStage("");
+      await updateProject(user.uid, project.id, {
+        chatHistory: [],
+        jobDescription: "",
+      });
+      toast.success("Chat cleared");
+    },
+    [user, project],
+  );
+
   return {
     project,
     masterLatex,
@@ -363,11 +387,15 @@ ${project.jobDescription}`;
     loading,
     busy,
     stage,
+    pipelineSteps,
+    atsScore,
+    bestScore,
     sendMessage,
     saveVersion,
     restoreVersion,
     deleteVersion,
     updateLatex,
+    clearChat,
     setProject,
   };
 }

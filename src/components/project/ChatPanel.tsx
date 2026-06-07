@@ -1,4 +1,4 @@
-import { Sparkles, FileText } from "lucide-react";
+import { Sparkles, FileText, Trash2 } from "lucide-react";
 import type { ChatMessage as ChatMessageType, GenerationStep, ATSScoreResult } from "@/types";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
@@ -11,6 +11,7 @@ interface Props {
     message: string,
     metadata?: { company?: string; targetRole?: string; instructions?: string },
   ) => void;
+  onClearChat?: () => void;
   busy: boolean;
   stage: string;
   projectName: string;
@@ -23,6 +24,7 @@ interface Props {
 export default function ChatPanel({
   chatHistory,
   onSend,
+  onClearChat,
   busy,
   stage,
   projectName,
@@ -35,16 +37,33 @@ export default function ChatPanel({
 
   const isFirstMessage = chatHistory.length === 0;
 
+  const handleClear = () => {
+    if (window.confirm("Are you sure you want to clear the chat history and job description?")) {
+      onClearChat?.();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border shrink-0">
-        <h2 className="font-medium text-sm truncate">{projectName}</h2>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">
-          {jobDescription
-            ? jobDescription.slice(0, 80) + "..."
-            : "Paste a job description to begin"}
-        </p>
+      <div className="px-4 py-3 border-b border-border shrink-0 flex items-center justify-between">
+        <div className="min-w-0 pr-8">
+          <h2 className="font-medium text-sm truncate">{projectName}</h2>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {jobDescription
+              ? jobDescription.slice(0, 80) + "..."
+              : "Paste a job description to begin"}
+          </p>
+        </div>
+        {onClearChat && !isFirstMessage && (
+          <button
+            onClick={handleClear}
+            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+            title="Clear Chat"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
