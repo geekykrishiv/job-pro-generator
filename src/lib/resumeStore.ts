@@ -195,7 +195,7 @@ export async function validateGeminiKeyDetailed(apiKey: string): Promise<Validat
   }
 
   try {
-    await generateGeminiText(key, GEMINI_CONFIG.MODEL, "Reply with OK only.", { maxOutputTokens: 16 });
+    await generateGeminiText(key, GEMINI_CONFIG.PRIMARY_MODEL, "Reply with OK only.", { maxOutputTokens: 16 });
     return { valid: true };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -205,7 +205,6 @@ export async function validateGeminiKeyDetailed(apiKey: string): Promise<Validat
     return { valid: false, error: msg };
   }
 }
-
 
 export async function validateGeminiKey(apiKey: string): Promise<boolean> {
   return (await validateGeminiKeyDetailed(apiKey)).valid;
