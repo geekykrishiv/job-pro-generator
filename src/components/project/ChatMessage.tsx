@@ -1,19 +1,31 @@
-import { Sparkles, User, Copy, Check } from "lucide-react";
+import { Sparkles, User, Copy, Check, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ChatMessage as ChatMessageType } from "@/types";
 
 interface Props {
   message: ChatMessageType;
+  onDelete?: () => Promise<void>;
 }
 
-export default function ChatMessage({ message }: Props) {
+export default function ChatMessage({ message, onDelete }: Props) {
   const [copied, setCopied] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const isUser = message.role === "user";
 
   const copyContent = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const deleteMessage = async () => {
+    if (!onDelete || !window.confirm("Delete this message?")) return;
+    setDeleting(true);
+    try {
+      await onDelete();
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const time = new Date(message.timestamp).toLocaleTimeString([], {
@@ -68,23 +80,35 @@ export default function ChatMessage({ message }: Props) {
         </div>
 
         {/* Footer */}
-        <div className={`flex items-center gap-2 mt-2 ${isUser ? "justify-end" : "justify-between"}`}>
+        <div className="flex items-center justify-between gap-2 mt-2">
           <span className={`text-[10px] ${isUser ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
             {time}
           </span>
-          {!isUser && (
-            <button
-              onClick={copyContent}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-background/50"
-              title="Copy message"
-            >
-              {copied ? (
-                <Check className="h-3 w-3 text-green-500" />
-              ) : (
-                <Copy className="h-3 w-3 text-muted-foreground" />
-              )}
-            </button>
-          )}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isUser && (
+              <button
+                onClick={copyContent}
+                className="p-1 rounded hover:bg-background/50"
+                title="Copy message"
+              >
+                {copied ? (
+                  <Check className="h-3 w-3 text-green-500" />
+                ) : (
+                  <Copy className="h-3 w-3 text-muted-foreground" />
+                )}
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={deleteMessage}
+                disabled={deleting}
+                className="p-1 rounded hover:bg-destructive/15 disabled:opacity-50"
+                title="Delete message"
+              >
+                <Trash2 className={`h-3 w-3 ${isUser ? "text-primary-foreground/70" : "text-destructive"}`} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

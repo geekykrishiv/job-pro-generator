@@ -11,6 +11,7 @@ interface Props {
     message: string,
     metadata?: { company?: string; targetRole?: string; instructions?: string },
   ) => void;
+  onDeleteMessage?: (messageIndex: number) => Promise<void>;
   onClearChat?: () => void;
   busy: boolean;
   stage: string;
@@ -24,6 +25,7 @@ interface Props {
 export default function ChatPanel({
   chatHistory,
   onSend,
+  onDeleteMessage,
   onClearChat,
   busy,
   stage,
@@ -96,7 +98,11 @@ export default function ChatPanel({
         )}
 
         {chatHistory.map((msg, i) => (
-          <ChatMessage key={i} message={msg} />
+          <ChatMessage
+            key={msg.id ?? `${msg.timestamp}-${i}`}
+            message={msg}
+            onDelete={!busy && onDeleteMessage ? () => onDeleteMessage(i) : undefined}
+          />
         ))}
 
         {/* Typing indicator / Pipeline Progress */}

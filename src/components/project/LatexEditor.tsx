@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { compileLatex, createPdfUrl } from '../../lib/latexCompiler';
 import type { ResumeVersion, ATSScoreResult } from "@/types";
-import { Loader2, MessageSquare, Download, Play, Save, History } from "lucide-react";
+import { Loader2, MessageSquare, Download, Play, Save, History, Home } from "lucide-react";
+import { Link } from "react-router-dom";
 import VersionHistory from "./VersionHistory";
 
 interface Props {
   latex: string;
+  projectName: string;
   onLatexChange: (latex: string) => void;
   onSaveVersion: () => void;
   onRegenerate?: () => void;
@@ -20,6 +22,7 @@ interface Props {
 
 export default function LatexEditor({
   latex,
+  projectName,
   onLatexChange,
   onSaveVersion,
   onRegenerate,
@@ -94,6 +97,19 @@ export default function LatexEditor({
     <div className="flex flex-col h-full bg-[#1e1e1e] w-full">
       {/* ── Top Bar ── */}
       <div className="flex items-center gap-3 px-4 py-2 bg-[#2d2d2d] border-b border-[#404040] shrink-0 overflow-x-auto">
+        <Link
+          to="/dashboard"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-200 hover:bg-[#404040] text-sm rounded shrink-0"
+          title="Dashboard"
+        >
+          <Home className="w-4 h-4" />
+          Dashboard
+        </Link>
+
+        <span className="text-white font-semibold text-sm truncate max-w-48 shrink-0" title={projectName}>
+          {projectName}
+        </span>
+
         <button
           onClick={onToggleChat}
           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded mr-2 shrink-0"
@@ -102,7 +118,7 @@ export default function LatexEditor({
           AI Chat
         </button>
 
-        <span className="text-white font-semibold text-sm font-mono shrink-0">resume.tex</span>
+        <span className="text-gray-400 text-xs font-mono shrink-0">resume.tex</span>
         
         <div className="flex-1" />
         

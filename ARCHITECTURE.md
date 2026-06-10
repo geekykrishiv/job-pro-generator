@@ -33,7 +33,7 @@ job-pro-generator/
 │   │   ├── ResumePreview.tsx   # PDF iframe renderer
 │   │   └── CompilationError.tsx # LaTeX error log viewer
 │   ├── config/           # Centralized application configs
-│   │   └── gemini.ts     # Gemini models (PRIMARY_MODEL, FALLBACK_MODELS)
+│   │   └── gemini.ts     # Gemini model configuration (PRIMARY_MODEL)
 │   ├── contexts/         # React Context providers
 │   │   └── AuthContext.tsx # Manages Firebase Auth state
 │   ├── lib/              # Core utility and service libraries

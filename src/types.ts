@@ -9,6 +9,7 @@ export interface MasterLatexResume {
 // ─── Chat & Project ─────────────────────────────────────────────────────
 
 export interface ChatMessage {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   timestamp: number;
