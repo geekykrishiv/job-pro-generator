@@ -88,6 +88,20 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
 
       const freshMaster = await getMasterLatexResume(user.uid);
       const masterLatexCode = freshMaster?.latexCode?.trim() ?? "";
+      // Verify the freshest version of the master resume is being used for generation.
+      // This makes it obvious when stale cached state would have caused drift.
+      console.log(
+        "[job-pro-generator] Master resume used for generation (first 200 chars):",
+        masterLatexCode.slice(0, 200),
+      );
+      console.log(
+        "[job-pro-generator] Master resume length:",
+        masterLatexCode.length,
+        "· updatedAt:",
+        freshMaster?.updatedAt,
+        "· title:",
+        freshMaster?.title,
+      );
       if (!masterLatexCode) {
         toast.error("Upload your Master LaTeX Resume first.");
         return;

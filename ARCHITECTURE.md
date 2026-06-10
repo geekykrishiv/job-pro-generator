@@ -17,7 +17,7 @@ Unlike a traditional web app with a standalone Node.js backend, this project lev
 - **Frontend Framework:** React 18, TypeScript, Vite
 - **Styling:** Tailwind CSS, `shadcn/ui` (Radix UI components)
 - **Database & Auth:** Firebase (Authentication, Firestore)
-- **AI Integration:** Google AI Studio SDK (`@google/generative-ai`, Gemini 2.5 Flash)
+- **AI Integration:** Google AI Studio SDK (`@google/genai`, Gemini 2.5 Flash)
 - **PDF Generation:** MiKTeX (`pdflatex` CLI binary)
 - **State Management:** React Context API (`AuthContext`)
 
@@ -39,7 +39,7 @@ job-pro-generator/
 │   ├── lib/              # Core utility and service libraries
 │   │   ├── firebase.ts   # Firebase initialization
 │   │   ├── resumeStore.ts# Firestore CRUD operations & Gemini Key validation
-│   │   ├── gemini.ts     # Google GenAI API client & auto-fallback logic
+│   │   ├── gemini.ts     # Google GenAI API client (single primary model)
 │   │   └── latexCompiler.ts # Frontend service fetching from the Vite compile endpoint
 │   ├── pages/            # Top-level route components (MasterResume, Settings, etc.)
 │   ├── types.ts          # Global TypeScript interfaces
@@ -55,8 +55,7 @@ job-pro-generator/
 ### A. The AI Tailoring Workflow
 1.  **Input:** The user uploads a Master Resume (`masterLatexResume` in Firestore) and a Job Description.
 2.  **Prompting:** `src/components/project/ProjectChat.tsx` constructs a system prompt containing the Master Resume and Job Description.
-3.  **Inference:** `src/lib/gemini.ts` calls Gemini via `@google/generative-ai` with master resume from Firestore.
-    - If `gemini-2.0-flash` returns a `429 Quota Exceeded` error, the system automatically catches the error and retries with `gemini-1.5-flash` to prevent UI crashes.
+3.  **Inference:** `src/lib/gemini.ts` calls Gemini via `@google/genai` (model `gemini-2.5-flash`) with the master resume from Firestore. A role-level `systemInstruction` enforces resume-writer rules (no invented content, preserve LaTeX, return only `\documentclass`…`\end{document}`).
 4.  **Parsing:** The AI returns optimized LaTeX code, which is saved as a new version in Firestore.
 
 ### B. The LaTeX Compilation Pipeline
@@ -89,4 +88,4 @@ Data is organized hierarchically to enforce strict user ownership:
 ### Architecture Benefits
 - **Zero Backend Deployment:** By embedding the compilation API into Vite, developers do not need to boot up a separate Express.js server during local development.
 - **Client-Side AI:** API keys are stored in Firebase on a per-user basis, meaning users bring their own Gemini keys, eliminating central API cost overhead for the platform.
-- **Robustness:** The Gemini fallback chain ensures high availability even on the Google GenAI free tier.
+- **Resilience:** The role-level `systemInstruction` in `src/lib/gemini.ts` enforces resume-writer rules on every call (no invented content, LaTeX formatting preserved, `\documentclass`…`\end{document}` only), so misformatted model output is rare. On LaTeX compile failure, `runResumePipeline` retries with a fix-up prompt via `fixLatex` (up to 5 attempts).
