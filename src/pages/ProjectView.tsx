@@ -21,7 +21,6 @@ export default function ProjectView() {
     restoreVersion,
     deleteVersion,
     updateLatex,
-    deleteChatMessage,
     clearChat,
     pipelineSteps,
     atsScore,
@@ -96,7 +95,6 @@ export default function ProjectView() {
           <ChatPanel
             chatHistory={project.chatHistory}
             onSend={sendMessage}
-            onDeleteMessage={deleteChatMessage}
             onClearChat={clearChat}
             busy={busy}
             stage={stage}
@@ -113,7 +111,6 @@ export default function ProjectView() {
       <div className="flex-1 h-full w-full">
         <LatexEditor
           latex={project.currentLatex}
-          projectName={project.name}
           onLatexChange={updateLatex}
           onSaveVersion={() => saveVersion()}
           onRegenerate={handleRegenerate}

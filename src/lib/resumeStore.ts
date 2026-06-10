@@ -54,11 +54,7 @@ export async function getMasterLatexResume(uid: string): Promise<MasterLatexResu
 }
 
 export async function saveMasterLatexResume(uid: string, resume: MasterLatexResume) {
-  await setDoc(
-    userDoc(uid),
-    removeUndefined({ masterLatexResume: resume }),
-    { mergeFields: ["masterLatexResume"] },
-  );
+  await setDoc(userDoc(uid), removeUndefined({ masterLatexResume: resume }), { merge: true });
 }
 
 // ─── Projects CRUD ──────────────────────────────────────────────────────

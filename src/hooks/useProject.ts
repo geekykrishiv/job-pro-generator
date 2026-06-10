@@ -37,7 +37,6 @@ interface UseProjectReturn {
   restoreVersion: (versionId: string) => void;
   deleteVersion: (versionId: string) => Promise<void>;
   updateLatex: (latex: string) => void;
-  deleteChatMessage: (messageIndex: number) => Promise<void>;
   clearChat: () => Promise<void>;
   setProject: React.Dispatch<React.SetStateAction<ResumeProject | null>>;
 }
@@ -113,7 +112,6 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
       }
 
       const userMsg: ChatMessage = {
-        id: crypto.randomUUID(),
         role: "user",
         content: message,
         timestamp: Date.now(),
@@ -188,7 +186,6 @@ ${project.jobDescription}`;
         }
 
         const assistantMsg: ChatMessage = {
-          id: crypto.randomUUID(),
           role: "assistant",
           content: assistantContent,
           timestamp: Date.now(),
@@ -277,13 +274,11 @@ ${project.jobDescription}`;
           versions: updated.versions,
           activeVersionId: updated.activeVersionId,
         });
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Failed to generate resume";
-        toast.error(message);
+      } catch (e: any) {
+        toast.error(e.message || "Failed to generate resume");
         const errorMsg: ChatMessage = {
-          id: crypto.randomUUID(),
           role: "assistant",
-          content: `❌ Error: ${message}. Please try again.`,
+          content: `❌ Error: ${e.message || "Something went wrong"}. Please try again.`,
           timestamp: Date.now(),
         };
         setProject((prev) =>
@@ -296,7 +291,7 @@ ${project.jobDescription}`;
         setStage("");
       }
     },
-    [user, project, projectId, apiKey]
+    [user, project, apiKey, masterLatex]
   );
 
   // Save current LaTeX as a new version
@@ -376,23 +371,6 @@ ${project.jobDescription}`;
     [project],
   );
 
-  const deleteChatMessage = useCallback(
-    async (messageIndex: number) => {
-      if (!user?.uid || !project) return;
-      const chatHistory = project.chatHistory.filter((_, index) => index !== messageIndex);
-
-      try {
-        await updateProject(user.uid, project.id, { chatHistory });
-        setProject((current) => current ? { ...current, chatHistory } : current);
-        toast.success("Message deleted");
-      } catch (error) {
-        console.error("Failed to delete chat message", error);
-        toast.error("Failed to delete message. Please try again.");
-      }
-    },
-    [user, project],
-  );
-
   // Clear chat history
   const clearChat = useCallback(
     async () => {
@@ -431,7 +409,6 @@ ${project.jobDescription}`;
     restoreVersion,
     deleteVersion,
     updateLatex,
-    deleteChatMessage,
     clearChat,
     setProject,
   };
