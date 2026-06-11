@@ -9,6 +9,7 @@ import {
 } from "@/lib/resumeStore";
 import { runResumePipeline } from "@/lib/resumePipeline";
 import { resolveGeminiKey } from "@/lib/geminiKey";
+import { buildTailoredResumePrompt } from "@/lib/resumePrompts";
 import type {
   ResumeProject,
   MasterLatexResume,
@@ -38,6 +39,7 @@ interface UseProjectReturn {
   deleteVersion: (versionId: string) => Promise<void>;
   updateLatex: (latex: string) => void;
   setProject: React.Dispatch<React.SetStateAction<ResumeProject | null>>;
+  clearChatHistory: () => Promise<void>;
 }
 
 export function useProject(projectId: string | undefined): UseProjectReturn {
@@ -96,11 +98,17 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
         setMasterLatex(freshMaster);
       }
 
+      // Build the prompt that will be sent to Gemini so we can attach it for "Copy Prompt"
+      const promptForLLM = buildTailoredResumePrompt(jdText, masterLatexCode);
+
       const userMsg: ChatMessage = {
         role: "user",
         content: message,
         timestamp: Date.now(),
-        metadata,
+        metadata: {
+          ...metadata,
+          prompt: promptForLLM,
+        },
       };
 
       const newHistory = [...project.chatHistory, userMsg];
@@ -356,6 +364,27 @@ ${project.jobDescription}`;
     [project],
   );
 
+  // Clear all chat messages for this project
+  const clearChatHistory = useCallback(
+    async () => {
+      if (!user?.uid || !project) {
+        if (!user?.uid) console.error('No authenticated user — cannot write to Firestore');
+        return;
+      }
+      try {
+        setProject({ ...project, chatHistory: [] });
+        await updateProject(user.uid, project.id, { chatHistory: [] });
+        toast.success("Chat history cleared");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Failed to clear chat history";
+        toast.error(msg);
+        // Revert optimistic update on failure
+        setProject(project);
+      }
+    },
+    [user, project],
+  );
+
   return {
     project,
     masterLatex,
@@ -369,5 +398,6 @@ ${project.jobDescription}`;
     deleteVersion,
     updateLatex,
     setProject,
+    clearChatHistory,
   };
 }

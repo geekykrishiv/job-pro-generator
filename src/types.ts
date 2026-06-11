@@ -17,6 +17,7 @@ export interface ChatMessage {
     targetRole?: string;
     instructions?: string;
     stage?: string;
+    prompt?: string; // The exact prompt sent to the LLM (for "Copy Prompt" feature)
   };
 }
 

@@ -1,7 +1,12 @@
-/** Google AI Studio / Gemini API keys */
+/**
+ * Google AI Studio / Gemini API keys.
+ * Accepts both legacy AIza... format and the new AQ. prefix format.
+ */
 export function isGeminiApiKey(key: string | undefined | null): boolean {
   const k = key?.trim() ?? "";
-  return k.startsWith("AIza");
+  // Legacy format: AIza... (39 chars total)
+  // New AI Studio format: AQ.<base64url-chars>
+  return k.startsWith("AIza") || /^AQ\.[A-Za-z0-9_\-]{10,}$/.test(k);
 }
 
 /** User Settings key, then GEMINI_API_KEY / VITE_GEMINI_API_KEY from .env.local */

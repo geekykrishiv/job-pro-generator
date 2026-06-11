@@ -23,7 +23,8 @@ export default function ProjectView() {
     updateLatex,
     pipelineSteps,
     atsScore,
-    bestScore
+    bestScore,
+    clearChatHistory,
   } = useProject(id);
 
   const [showChat, setShowChat] = useState(false);
@@ -94,6 +95,7 @@ export default function ProjectView() {
           <ChatPanel
             chatHistory={project.chatHistory}
             onSend={sendMessage}
+            onClearChat={clearChatHistory}
             busy={busy}
             stage={stage}
             projectName={project.name}

@@ -190,7 +190,7 @@ export async function validateGeminiKeyDetailed(apiKey: string): Promise<Validat
   if (!isGeminiApiKey(key)) {
     return {
       valid: false,
-      error: "Use a Google Gemini key (AIza...) from aistudio.google.com/apikey",
+      error: "Use a Google Gemini key (AIza... or AQ....) from aistudio.google.com/apikey",
     };
   }
 
