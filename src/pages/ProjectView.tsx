@@ -21,7 +21,6 @@ export default function ProjectView() {
     restoreVersion,
     deleteVersion,
     updateLatex,
-    clearChat,
     pipelineSteps,
     atsScore,
     bestScore
@@ -95,7 +94,6 @@ export default function ProjectView() {
           <ChatPanel
             chatHistory={project.chatHistory}
             onSend={sendMessage}
-            onClearChat={clearChat}
             busy={busy}
             stage={stage}
             projectName={project.name}

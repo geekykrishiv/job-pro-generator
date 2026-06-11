@@ -32,17 +32,6 @@ export async function runResumePipeline({
   MAX_ATS_RETRIES = 3,
   MAX_FIX_RETRIES = 5,
 }: PipelineParams): Promise<PipelineResult> {
-  // Confirm the master resume we're about to inject into the prompt matches
-  // what the user most recently uploaded (first 200 chars + total length).
-  console.log(
-    "[job-pro-generator] Pipeline received master resume (first 200 chars):",
-    masterResumeLatex.slice(0, 200),
-  );
-  console.log(
-    "[job-pro-generator] Pipeline master resume length:",
-    masterResumeLatex.length,
-  );
-
   const steps: GenerationStep[] = [
     { id: 'generate', label: 'Generating tailored resume', status: 'pending' },
     { id: 'ats', label: 'Scoring ATS compatibility', status: 'pending' },

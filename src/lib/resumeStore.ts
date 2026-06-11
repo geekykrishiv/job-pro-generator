@@ -11,8 +11,8 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { MasterLatexResume, ResumeProject, ResumeVersion, ChatMessage, ATSScoreResult } from "@/types";
-import { GEMINI_CONFIG } from "@/config/gemini";
-import { generateGeminiText } from "./gemini";
+import { GEMINI_MODEL_CHAIN } from "@/config/gemini";
+import { extractGeminiHttpStatus, generateGeminiText, isRetryableGeminiError } from "./gemini";
 import { isGeminiApiKey } from "./geminiKey";
 import { deleteField } from "firebase/firestore";
 
@@ -194,16 +194,25 @@ export async function validateGeminiKeyDetailed(apiKey: string): Promise<Validat
     };
   }
 
-  try {
-    await generateGeminiText(key, GEMINI_CONFIG.PRIMARY_MODEL, "Reply with OK only.", { maxOutputTokens: 16 });
-    return { valid: true };
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (/401|403|invalid/i.test(msg)) {
-      return { valid: false, error: "Invalid Gemini API key. Check AI Studio and try again." };
+  let lastError = "Unknown error";
+
+  for (let i = 0; i < GEMINI_MODEL_CHAIN.length; i++) {
+    const model = GEMINI_MODEL_CHAIN[i];
+    try {
+      await generateGeminiText(key, model, "Reply with OK only.", { maxOutputTokens: 16 });
+      return { valid: true };
+    } catch (error: unknown) {
+      const status = extractGeminiHttpStatus(error);
+      lastError = error instanceof Error ? error.message : String(error);
+      if (status === 401 || status === 403) {
+        return { valid: false, error: "Invalid Gemini API key. Check AI Studio and try again." };
+      }
+      if (isRetryableGeminiError(error) && i < GEMINI_MODEL_CHAIN.length - 1) continue;
+      return { valid: false, error: lastError };
     }
-    return { valid: false, error: msg };
   }
+
+  return { valid: false, error: lastError };
 }
 
 export async function validateGeminiKey(apiKey: string): Promise<boolean> {

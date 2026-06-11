@@ -37,7 +37,6 @@ interface UseProjectReturn {
   restoreVersion: (versionId: string) => void;
   deleteVersion: (versionId: string) => Promise<void>;
   updateLatex: (latex: string) => void;
-  clearChat: () => Promise<void>;
   setProject: React.Dispatch<React.SetStateAction<ResumeProject | null>>;
 }
 
@@ -88,20 +87,6 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
 
       const freshMaster = await getMasterLatexResume(user.uid);
       const masterLatexCode = freshMaster?.latexCode?.trim() ?? "";
-      // Verify the freshest version of the master resume is being used for generation.
-      // This makes it obvious when stale cached state would have caused drift.
-      console.log(
-        "[job-pro-generator] Master resume used for generation (first 200 chars):",
-        masterLatexCode.slice(0, 200),
-      );
-      console.log(
-        "[job-pro-generator] Master resume length:",
-        masterLatexCode.length,
-        "· updatedAt:",
-        freshMaster?.updatedAt,
-        "· title:",
-        freshMaster?.title,
-      );
       if (!masterLatexCode) {
         toast.error("Upload your Master LaTeX Resume first.");
         return;
@@ -371,29 +356,6 @@ ${project.jobDescription}`;
     [project],
   );
 
-  // Clear chat history
-  const clearChat = useCallback(
-    async () => {
-      if (!user?.uid || !project) return;
-      const updated = {
-        ...project,
-        chatHistory: [],
-        jobDescription: "",
-      };
-      setProject(updated);
-      setPipelineSteps([]);
-      setAtsScore(null);
-      setBestScore(0);
-      setStage("");
-      await updateProject(user.uid, project.id, {
-        chatHistory: [],
-        jobDescription: "",
-      });
-      toast.success("Chat cleared");
-    },
-    [user, project],
-  );
-
   return {
     project,
     masterLatex,
@@ -401,15 +363,11 @@ ${project.jobDescription}`;
     loading,
     busy,
     stage,
-    pipelineSteps,
-    atsScore,
-    bestScore,
     sendMessage,
     saveVersion,
     restoreVersion,
     deleteVersion,
     updateLatex,
-    clearChat,
     setProject,
   };
 }
