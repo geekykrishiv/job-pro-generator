@@ -19,6 +19,7 @@ export const GEMINI_CONFIG = {
   SCORING_CONFIG: {
     temperature: 0.1,
     maxOutputTokens: 2048,
+    responseMimeType: "application/json",
   } satisfies GenerationConfig,
 } as const;
 

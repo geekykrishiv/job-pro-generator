@@ -15,6 +15,21 @@ function cleanLatex(raw: string): string {
   return idx > 0 ? s.slice(idx).trim() : s;
 }
 
+/** Strip LaTeX commands/syntax so the scorer sees plain text, not \commands. */
+function latexToPlainText(latex: string): string {
+  return latex
+    // remove comment lines
+    .replace(/^\s*%.*$/gm, " ")
+    // drop \begin{...} / \end{...} tags
+    .replace(/\\(begin|end)\{[^}]+\}/g, " ")
+    // drop \command[opts]{arg}{arg} sequences entirely
+    .replace(/\\[a-zA-Z@]+\*?(?:\[[^\]]*\])?(?:\{[^}]*\})*/g, " ")
+    // collapse braces / special chars
+    .replace(/[{}\\%$&#^~_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function generateResume(
   jd: string,
   masterResumeLatex: string,
@@ -30,11 +45,19 @@ export async function scoreResume(
   jd: string,
   geminiKey: string,
 ): Promise<ATSScoreResult> {
-  const prompt = buildScoreResumePrompt(jd, latex);
+  const plainResume = latexToPlainText(latex);
+  console.log("[scoreResume] resume (first 300 chars):", plainResume.slice(0, 300));
+  console.log("[scoreResume] jd (first 300 chars):", jd.slice(0, 300));
+  const prompt = buildScoreResumePrompt(jd, plainResume);
 
   try {
     const rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.SCORING_CONFIG);
-    const cleaned = rawResult.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+    // responseMimeType: "application/json" means rawResult IS JSON, but
+    // models occasionally still wrap in fences — be defensive.
+    const cleaned = rawResult
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/, "")
+      .trim();
     const parsed = JSON.parse(cleaned) as ATSScoreResult;
     return {
       score: parsed.score || 0,
