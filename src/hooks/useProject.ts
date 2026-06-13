@@ -98,6 +98,23 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
         setMasterLatex(freshMaster);
       }
 
+      const newHistory = [...project.chatHistory];
+      const isFirstMessage = project.chatHistory.length === 0;
+
+      let jdText = isFirstMessage ? message : project.jobDescription;
+
+      // If refinement, prepend context
+      if (!isFirstMessage && project.currentLatex) {
+        jdText = `PREVIOUS RESUME LATEX:
+${project.currentLatex}
+
+USER REFINEMENT REQUEST:
+${message}
+
+ORIGINAL JOB DESCRIPTION:
+${project.jobDescription}`;
+      }
+
       // Build the prompt that will be sent to Gemini so we can attach it for "Copy Prompt"
       const promptForLLM = buildTailoredResumePrompt(jdText, masterLatexCode);
 
@@ -110,23 +127,7 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
           prompt: promptForLLM,
         },
       };
-
-      const newHistory = [...project.chatHistory, userMsg];
-      const isFirstMessage = project.chatHistory.length === 0;
-      
-      let jdText = isFirstMessage ? message : project.jobDescription;
-      
-      // If refinement, prepend context
-      if (!isFirstMessage && project.currentLatex) {
-        jdText = `PREVIOUS RESUME LATEX:
-${project.currentLatex}
-
-USER REFINEMENT REQUEST:
-${message}
-
-ORIGINAL JOB DESCRIPTION:
-${project.jobDescription}`;
-      }
+      newHistory.push(userMsg);
 
       const jobDescription = isFirstMessage ? message : project.jobDescription;
       const company = metadata?.company || project.company;
