@@ -46,20 +46,30 @@ export async function scoreResume(
   geminiKey: string,
 ): Promise<ATSScoreResult> {
   const plainResume = latexToPlainText(latex);
-  console.log("[scoreResume] resume (first 300 chars):", plainResume.slice(0, 300));
-  console.log("[scoreResume] jd (first 300 chars):", jd.slice(0, 300));
+  console.log("[scoreResume] INPUT latex length:", latex.length, "first 300:", latex.slice(0, 300));
+  console.log("[scoreResume] INPUT plainResume length:", plainResume.length, "first 300:", plainResume.slice(0, 300));
+  console.log("[scoreResume] INPUT jd length:", jd.length, "first 300:", jd.slice(0, 300));
   const prompt = buildScoreResumePrompt(jd, plainResume);
+  console.log("[scoreResume] PROMPT (full):\n", prompt);
+
+  let rawResult: string;
+  try {
+    rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.SCORING_CONFIG);
+  } catch (e) {
+    console.error("[scoreResume] callGemini THREW:", e);
+    throw e;
+  }
+  console.log("[scoreResume] RAW LLM RESPONSE (length=" + rawResult.length + "):\n", rawResult);
 
   try {
-    const rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.SCORING_CONFIG);
-    // responseMimeType: "application/json" means rawResult IS JSON, but
-    // models occasionally still wrap in fences — be defensive.
     const cleaned = rawResult
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```\s*$/, "")
       .trim();
+    console.log("[scoreResume] CLEANED for parse (length=" + cleaned.length + "):\n", cleaned);
     const parsed = JSON.parse(cleaned) as ATSScoreResult;
-    return {
+    console.log("[scoreResume] PARSED OBJECT:", JSON.stringify(parsed, null, 2));
+    const final = {
       score: parsed.score || 0,
       keyword_match: parsed.keyword_match || 0,
       skills_alignment: parsed.skills_alignment || 0,
@@ -69,8 +79,10 @@ export async function scoreResume(
       missing_keywords: Array.isArray(parsed.missing_keywords) ? parsed.missing_keywords : [],
       improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
     };
+    console.log("[scoreResume] RETURNING:", JSON.stringify(final, null, 2));
+    return final;
   } catch (err) {
-    console.error("scoreResume JSON parse error", err);
+    console.error("[scoreResume] JSON.parse THREW:", err);
     return {
       score: 0,
       keyword_match: 0,

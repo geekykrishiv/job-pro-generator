@@ -65,7 +65,18 @@ export async function generateGeminiText(
     generationConfig,
   });
   const result = await model.generateContent(prompt);
-  return result.response.text();
+  // Prefer the SDK helper, but it can return "" in JSON mode if the
+  // response is structured-only — fall back to the raw candidate parts.
+  const direct = result.response.text();
+  if (direct && direct.length > 0) return direct;
+  const parts = result.response.candidates?.[0]?.content?.parts;
+  if (parts && parts.length > 0) {
+    const joined = parts
+      .map((p) => ("text" in p && typeof p.text === "string" ? p.text : ""))
+      .join("");
+    if (joined) return joined;
+  }
+  return direct;
 }
 
 /**
