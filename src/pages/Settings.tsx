@@ -176,13 +176,7 @@ export default function Settings() {
 
             <p className="text-xs text-muted-foreground">
               Free tier available on Google AI Studio. Model:{" "}
-              <code className="text-[10px]">{GEMINI_CONFIG.PRIMARY_MODEL}</code>
-              {GEMINI_CONFIG.FALLBACK_MODELS.length > 0 && (
-                <>
-                  {" "}
-                  (fallback: <code className="text-[10px]">{GEMINI_CONFIG.FALLBACK_MODELS.join(", ")}</code>)
-                </>
-              )}
+              <code className="text-[10px]">{GEMINI_CONFIG.MODEL}</code>
               . Optional: <code className="text-[10px]">GEMINI_API_KEY</code> in{" "}
               <code className="text-[10px]">.env.local</code>
               {resolveGeminiKey() ? " (env key detected)." : "."}
