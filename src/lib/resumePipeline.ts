@@ -4,6 +4,8 @@ import type { ATSScoreResult, GenerationStep } from "@/types";
 
 interface PipelineParams {
   jd: string;
+  /** Job description only — used for ATS scoring (not refinement context). */
+  scoringJd: string;
   masterResumeLatex: string;
   apiKey: string;
   onStepUpdate: (steps: GenerationStep[]) => void;
@@ -24,6 +26,7 @@ interface PipelineResult {
 
 export async function runResumePipeline({
   jd,
+  scoringJd,
   masterResumeLatex,
   apiKey,
   onStepUpdate,
@@ -75,7 +78,7 @@ export async function runResumePipeline({
     let atsAttempts = 0;
 
     while (atsAttempts <= MAX_ATS_RETRIES) {
-      const scoreData = await scoreResume(currentLatex, jd, apiKey);
+      const scoreData = await scoreResume(currentLatex, scoringJd, apiKey);
       onScoreUpdate(scoreData);
 
       updateStep('ats', { detail: `Attempt ${atsAttempts + 1}: Score ${scoreData.score}/100` });

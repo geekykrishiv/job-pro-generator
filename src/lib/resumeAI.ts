@@ -1,5 +1,7 @@
 import { callGemini } from "./gemini";
 import { GEMINI_CONFIG } from "@/config/gemini";
+import { extractKeywords, scoreResumeMatch } from "./atsAnalyzer";
+import { isEmptyAtsScore, parseAtsScoreJson } from "./atsScoreParse";
 import {
   buildFixLatexPrompt,
   buildRewriteResumePrompt,
@@ -15,19 +17,39 @@ function cleanLatex(raw: string): string {
   return idx > 0 ? s.slice(idx).trim() : s;
 }
 
-/** Strip LaTeX commands/syntax so the scorer sees plain text, not \commands. */
+/** Plain text for ATS scoring — preserves braced content from \\commands. */
 function latexToPlainText(latex: string): string {
-  return latex
-    // remove comment lines
-    .replace(/^\s*%.*$/gm, " ")
-    // drop \begin{...} / \end{...} tags
+  let s = latex.replace(/^\s*%.*$/gm, " ");
+  for (let i = 0; i < 6; i++) {
+    s = s.replace(/\\[a-zA-Z@]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}/g, " $1 ");
+  }
+  return s
     .replace(/\\(begin|end)\{[^}]+\}/g, " ")
-    // drop \command[opts]{arg}{arg} sequences entirely
-    .replace(/\\[a-zA-Z@]+\*?(?:\[[^\]]*\])?(?:\{[^}]*\})*/g, " ")
-    // collapse braces / special chars
+    .replace(/\\[a-zA-Z@]+/g, " ")
     .replace(/[{}\\%$&#^~_]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function resumeTextForScoring(latex: string): string {
+  const plain = latexToPlainText(latex);
+  return plain.length >= 80 ? plain : latex.replace(/\s+/g, " ").trim();
+}
+
+function localAtsFallback(latex: string, jobDescription: string): ATSScoreResult {
+  const ats = extractKeywords(jobDescription);
+  const match = scoreResumeMatch(latex, ats);
+  const overall = match.overall;
+  return {
+    score: overall,
+    keyword_match: Math.min(40, Math.round(overall * 0.4)),
+    skills_alignment: Math.min(25, Math.round(overall * 0.25)),
+    action_verbs: Math.min(15, Math.round(overall * 0.15)),
+    structure: Math.min(10, Math.round(overall * 0.1)),
+    project_relevance: Math.min(10, Math.round(overall * 0.1)),
+    missing_keywords: [...match.missingKeywords, ...match.missingSkills].slice(0, 12),
+    improvements: match.missingKeywords.slice(0, 5).map((k) => `Incorporate keyword: ${k}`),
+  };
 }
 
 export async function generateResume(
@@ -42,57 +64,35 @@ export async function generateResume(
 
 export async function scoreResume(
   latex: string,
-  jd: string,
+  jobDescription: string,
   geminiKey: string,
 ): Promise<ATSScoreResult> {
-  const plainResume = latexToPlainText(latex);
-  console.log("[scoreResume] INPUT latex length:", latex.length, "first 300:", latex.slice(0, 300));
-  console.log("[scoreResume] INPUT plainResume length:", plainResume.length, "first 300:", plainResume.slice(0, 300));
-  console.log("[scoreResume] INPUT jd length:", jd.length, "first 300:", jd.slice(0, 300));
-  const prompt = buildScoreResumePrompt(jd, plainResume);
-  console.log("[scoreResume] PROMPT (full):\n", prompt);
-
-  let rawResult: string;
-  try {
-    rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.SCORING_CONFIG);
-  } catch (e) {
-    console.error("[scoreResume] callGemini THREW:", e);
-    throw e;
+  if (!latex?.trim()) {
+    throw new Error("Cannot score ATS: resume LaTeX is empty.");
   }
-  console.log("[scoreResume] RAW LLM RESPONSE (length=" + rawResult.length + "):\n", rawResult);
+  if (!jobDescription?.trim()) {
+    throw new Error("Cannot score ATS: job description is empty.");
+  }
+
+  const resumeText = resumeTextForScoring(latex);
+  const prompt = buildScoreResumePrompt(jobDescription, resumeText);
 
   try {
-    const cleaned = rawResult
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```\s*$/, "")
-      .trim();
-    console.log("[scoreResume] CLEANED for parse (length=" + cleaned.length + "):\n", cleaned);
-    const parsed = JSON.parse(cleaned) as ATSScoreResult;
-    console.log("[scoreResume] PARSED OBJECT:", JSON.stringify(parsed, null, 2));
-    const final = {
-      score: parsed.score || 0,
-      keyword_match: parsed.keyword_match || 0,
-      skills_alignment: parsed.skills_alignment || 0,
-      action_verbs: parsed.action_verbs || 0,
-      structure: parsed.structure || 0,
-      project_relevance: parsed.project_relevance || 0,
-      missing_keywords: Array.isArray(parsed.missing_keywords) ? parsed.missing_keywords : [],
-      improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
-    };
-    console.log("[scoreResume] RETURNING:", JSON.stringify(final, null, 2));
-    return final;
+    const rawResult = await callGemini(geminiKey, prompt, GEMINI_CONFIG.SCORING_CONFIG);
+    if (!rawResult?.trim()) {
+      console.warn("[scoreResume] Empty LLM response — using local keyword match fallback.");
+      return localAtsFallback(latex, jobDescription);
+    }
+
+    const parsed = parseAtsScoreJson(rawResult);
+    if (isEmptyAtsScore(parsed)) {
+      console.warn("[scoreResume] LLM returned all-zero score — using local keyword match fallback.");
+      return localAtsFallback(latex, jobDescription);
+    }
+    return parsed;
   } catch (err) {
-    console.error("[scoreResume] JSON.parse THREW:", err);
-    return {
-      score: 0,
-      keyword_match: 0,
-      skills_alignment: 0,
-      action_verbs: 0,
-      structure: 0,
-      project_relevance: 0,
-      missing_keywords: [],
-      improvements: ["Failed to parse ATS score from AI."],
-    };
+    console.error("[scoreResume] Parse/API error, using local fallback:", err);
+    return localAtsFallback(latex, jobDescription);
   }
 }
 

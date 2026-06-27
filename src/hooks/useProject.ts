@@ -148,6 +148,7 @@ ${project.jobDescription}`;
       try {
         const result = await runResumePipeline({
           jd: jdText,
+          scoringJd: jobDescription,
           masterResumeLatex: masterLatexCode,
           apiKey: resolveGeminiKey(apiKey),
           onStepUpdate: (steps) => {

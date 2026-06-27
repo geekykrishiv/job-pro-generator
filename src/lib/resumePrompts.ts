@@ -81,28 +81,29 @@ Return the improved full LaTeX resume:
 `.trim();
 }
 
-export function buildScoreResumePrompt(jobDescription: string, latex: string): string {
+export function buildScoreResumePrompt(jobDescription: string, resumeText: string): string {
   return `
 You are an ATS scoring engine. Score this resume 0–100 against the job description.
 
-Rubric:
-- keyword_match (max 40): JD keywords in resume
-- skills_alignment (max 25): required skills covered
-- action_verbs (max 15): strong verbs and measurable impact
-- structure (max 10): clean ATS-readable sections
-- project_relevance (max 10): projects match role
+Rubric (sub-scores must reflect your evaluation — do NOT return all zeros unless the resume is completely empty):
+- keyword_match (0–40): JD keywords present in resume
+- skills_alignment (0–25): required skills covered
+- action_verbs (0–15): strong verbs and measurable impact
+- structure (0–10): clear ATS-readable sections
+- project_relevance (0–10): projects match the role
+- score (0–100): overall total (should equal sum of sub-scores)
 
-Return ONLY valid JSON, no markdown:
-{"score":0,"keyword_match":0,"skills_alignment":0,"action_verbs":0,"structure":0,"project_relevance":0,"missing_keywords":[],"improvements":[]}
+Return ONLY valid JSON with these exact snake_case keys:
+{"score":75,"keyword_match":30,"skills_alignment":20,"action_verbs":10,"structure":8,"project_relevance":7,"missing_keywords":["example"],"improvements":["example tip"]}
 
 JOB DESCRIPTION:
 ---
 ${jobDescription}
 ---
 
-RESUME (LaTeX):
+RESUME TEXT:
 ---
-${latex}
+${resumeText}
 ---
 `.trim();
 }
