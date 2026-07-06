@@ -8,6 +8,7 @@ import {
   deleteDoc,
   query,
   orderBy,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { MasterLatexResume, ResumeProject, ResumeVersion, ChatMessage, ATSScoreResult } from "@/types";
@@ -91,6 +92,14 @@ export async function updateProject(uid: string, pid: string, patch: Partial<Res
 }
 
 export async function deleteProject(uid: string, pid: string) {
+  // Delete versions subcollection first to avoid orphaned docs
+  const vColRef = collection(db, "users", uid, "projects", pid, "versions");
+  const vSnap = await getDocs(vColRef);
+  if (!vSnap.empty) {
+    const batch = writeBatch(db);
+    vSnap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
   await deleteDoc(projectDoc(uid, pid));
 }
 
