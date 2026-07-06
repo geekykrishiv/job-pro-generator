@@ -1,13 +1,17 @@
-import { Sparkles, User, Copy, Check, ClipboardList } from "lucide-react";
+import { Sparkles, User, Copy, Check, ClipboardList, MoreVertical, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { toast } from "sonner";
 
 interface Props {
   message: ChatMessageType;
+  isMenuOpen?: boolean;
+  menuRef?: React.RefObject<HTMLDivElement | null> | null;
+  onToggleMenu?: (e: React.MouseEvent) => void;
+  onDelete?: () => void;
 }
 
-export default function ChatMessage({ message }: Props) {
+export default function ChatMessage({ message, isMenuOpen, menuRef, onToggleMenu, onDelete }: Props) {
   const [copied, setCopied] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
   const isUser = message.role === "user";
@@ -36,7 +40,7 @@ export default function ChatMessage({ message }: Props) {
   });
 
   return (
-    <div className={`chat-message group flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
+    <div className={`chat-message group flex gap-3 relative ${isUser ? "flex-row-reverse" : ""}`}>
       {/* Avatar */}
       <div
         className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-1 ${
@@ -119,6 +123,34 @@ export default function ChatMessage({ message }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Three-dot delete button — only visible on row hover, absolutely positioned so it never shifts layout */}
+      {onToggleMenu && (
+        <div
+          className={`absolute ${isUser ? "left-8" : "right-8"} top-1/2 -translate-y-1/2`}
+          ref={menuRef ?? undefined}
+        >
+          <button
+            title="Message options"
+            onClick={onToggleMenu}
+            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+          </button>
+
+          {isMenuOpen && (
+            <div className={`absolute ${isUser ? "left-0" : "right-0"} top-full mt-0.5 z-50 min-w-[150px] rounded-md border border-border bg-popover shadow-md py-1`}>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete message
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

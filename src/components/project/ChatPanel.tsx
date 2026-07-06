@@ -1,5 +1,5 @@
 import { Sparkles, FileText, MoreVertical, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ChatMessage as ChatMessageType, GenerationStep, ATSScoreResult } from "@/types";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
@@ -13,6 +13,7 @@ interface Props {
     metadata?: { company?: string; targetRole?: string; instructions?: string },
   ) => void;
   onClearChat: () => Promise<void>;
+  onDeleteMessage: (timestamp: number) => Promise<void>;
   busy: boolean;
   stage: string;
   projectName: string;
@@ -26,6 +27,7 @@ export default function ChatPanel({
   chatHistory,
   onSend,
   onClearChat,
+  onDeleteMessage,
   busy,
   stage,
   projectName,
@@ -37,6 +39,19 @@ export default function ChatPanel({
   const scrollRef = useAutoScroll(chatHistory.length + (busy ? 1 : 0));
   const [menuOpen, setMenuOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [openMenuTimestamp, setOpenMenuTimestamp] = useState<number | null>(null);
+  const msgMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close per-message dropdown on any outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (msgMenuRef.current && !msgMenuRef.current.contains(e.target as Node)) {
+        setOpenMenuTimestamp(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const isFirstMessage = chatHistory.length === 0;
 
@@ -150,7 +165,22 @@ export default function ChatPanel({
         )}
 
         {chatHistory.map((msg, i) => (
-          <ChatMessage key={i} message={msg} />
+          <ChatMessage
+            key={i}
+            message={msg}
+            isMenuOpen={openMenuTimestamp === msg.timestamp}
+            menuRef={openMenuTimestamp === msg.timestamp ? msgMenuRef : null}
+            onToggleMenu={(e) => {
+              e.stopPropagation();
+              setOpenMenuTimestamp(
+                openMenuTimestamp === msg.timestamp ? null : msg.timestamp,
+              );
+            }}
+            onDelete={async () => {
+              setOpenMenuTimestamp(null);
+              await onDeleteMessage(msg.timestamp);
+            }}
+          />
         ))}
 
         {/* Typing indicator / Pipeline Progress */}

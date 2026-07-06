@@ -25,6 +25,7 @@ export default function ProjectView() {
     atsScore,
     bestScore,
     clearChatHistory,
+    deleteMessage,
   } = useProject(id);
 
   const [showChat, setShowChat] = useState(false);
@@ -96,6 +97,7 @@ export default function ProjectView() {
             chatHistory={project.chatHistory}
             onSend={sendMessage}
             onClearChat={clearChatHistory}
+            onDeleteMessage={deleteMessage}
             busy={busy}
             stage={stage}
             projectName={project.name}

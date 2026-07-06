@@ -40,6 +40,7 @@ interface UseProjectReturn {
   updateLatex: (latex: string) => void;
   setProject: React.Dispatch<React.SetStateAction<ResumeProject | null>>;
   clearChatHistory: () => Promise<void>;
+  deleteMessage: (timestamp: number) => Promise<void>;
 }
 
 export function useProject(projectId: string | undefined): UseProjectReturn {
@@ -387,6 +388,25 @@ ${project.jobDescription}`;
     [user, project],
   );
 
+  // Delete a single chat message identified by its timestamp
+  const deleteMessage = useCallback(
+    async (timestamp: number) => {
+      if (!user?.uid || !project) return;
+      const updated = project.chatHistory.filter((m) => m.timestamp !== timestamp);
+      const snapshot = project;
+      try {
+        setProject({ ...project, chatHistory: updated });
+        await updateProject(user.uid, project.id, { chatHistory: updated });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Failed to delete message";
+        toast.error(msg);
+        // Revert optimistic update on failure
+        setProject(snapshot);
+      }
+    },
+    [user, project],
+  );
+
   return {
     project,
     masterLatex,
@@ -401,5 +421,6 @@ ${project.jobDescription}`;
     updateLatex,
     setProject,
     clearChatHistory,
+    deleteMessage,
   };
 }
