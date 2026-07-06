@@ -9,7 +9,7 @@ import latexCompileDevProxy from "./vite-plugin-latex-compile";
 export default defineConfig(({ mode }) => ({
   envPrefix: ["VITE_", "GEMINI_"],
   server: {
-    host: "127.0.0.1",   // localhost only — do not expose dev server to network
+    host: "localhost",    // must match Firebase API key referrer restriction (localhost)
     cors: false,          // mitigate GHSA-67mh-4wv8-2f99 (esbuild CORS bypass)
     port: 8080,
     hmr: {
