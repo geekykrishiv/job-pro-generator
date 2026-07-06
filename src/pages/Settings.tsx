@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Eye, EyeOff, ExternalLink, AlertTriangle } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -26,6 +26,9 @@ export default function Settings() {
   const [showKey, setShowKey] = useState(false);
   const [validating, setValidating] = useState(false);
   const [keyValid, setKeyValid] = useState<boolean | null>(null);
+
+  // Warn when the key originates from VITE_GEMINI_API_KEY (bundled into production JS)
+  const envKeyExposed = Boolean(import.meta.env.VITE_GEMINI_API_KEY);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -181,6 +184,20 @@ export default function Settings() {
               <code className="text-[10px]">.env.local</code>
               {resolveGeminiKey() ? " (env key detected)." : "."}
             </p>
+
+            {/* Warning: VITE_GEMINI_API_KEY is bundled into the production build */}
+            {envKeyExposed && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  <strong>Dev-only key detected.</strong> Your{" "}
+                  <code className="text-[10px]">VITE_GEMINI_API_KEY</code> is bundled into the
+                  production JavaScript and visible to anyone who inspects the build. For
+                  production use, enter your key in the field above — it will be stored
+                  securely in your account instead.
+                </span>
+              </div>
+            )}
           </div>
         </Card>
 

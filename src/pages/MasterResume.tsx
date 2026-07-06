@@ -90,6 +90,11 @@ export default function MasterResumePage() {
       toast.error("Please upload a .tex file");
       return;
     }
+    // File size cap: 5 MB
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File is too large. Maximum allowed size is 5 MB.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const content = ev.target?.result as string;

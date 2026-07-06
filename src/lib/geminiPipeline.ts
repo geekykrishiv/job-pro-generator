@@ -122,6 +122,14 @@ export async function generateTailoredResume({
   if (!masterResumeLatex.trim()) throw new Error("No master resume found. Upload your LaTeX resume first.");
   if (!jobDescription.trim()) throw new Error("Job description is empty.");
 
+  // Input length guards — prevent prompt-stuffing / quota exhaustion
+  if (jobDescription.length > 15_000)
+    throw new Error("Job description is too long (max 15,000 characters).");
+  if (masterResumeLatex.length > 50_000)
+    throw new Error("Master resume is too long (max 50,000 characters).");
+  if ((additionalInstructions ?? "").length > 2_000)
+    throw new Error("Additional instructions are too long (max 2,000 characters).");
+
   // Step 1: Extract ATS keywords locally (no API call needed)
   const atsAnalysis = extractKeywords(jobDescription);
 
@@ -213,6 +221,12 @@ export async function refineTailoredResume(
   jobDescription: string,
   userRequest: string,
 ): Promise<string> {
+  // Input length guards
+  if (userRequest.length > 2_000)
+    throw new Error("Refinement request is too long (max 2,000 characters).");
+  if (currentLatex.length > 50_000)
+    throw new Error("Resume content is too long to refine.");
+
   const prompt = `CURRENT TAILORED RESUME (LaTeX):\n${currentLatex}\n\nORIGINAL MASTER RESUME (LaTeX):\n${masterResumeLatex}\n\nJOB DESCRIPTION:\n${jobDescription}\n\nUSER REQUEST:\n${userRequest}\n\nApply the requested changes. Return ONLY valid LaTeX.`;
   const raw = await callGemini(apiKey, `${REFINE_SYSTEM_PROMPT}\n\n${prompt}`, GEMINI_CONFIG.GENERATION_CONFIG);
   return extractLatexCode(raw);
