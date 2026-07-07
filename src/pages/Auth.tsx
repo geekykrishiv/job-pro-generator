@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
   createUserWithEmailAndPassword,
@@ -6,7 +6,8 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +24,21 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Handle the result after Google redirect returns to this page
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          nav("/dashboard");
+        }
+      })
+      .catch((err: any) => {
+        if (err.code !== "auth/no-auth-event") {
+          toast.error(err.message);
+        }
+      });
+  }, []);
 
   if (loading) return null;
   if (user) return <Navigate to="/dashboard" replace />;
@@ -55,14 +71,16 @@ export default function AuthPage() {
     setBusy(true);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      nav("/dashboard");
+      // Use redirect instead of popup — popup routes through resume-builder-f83be.firebaseapp.com
+      // which is blocked by the API key's HTTP referrer restriction.
+      await signInWithRedirect(auth, provider);
+      // Page will redirect away; execution resumes in the useEffect above after Google returns.
     } catch (err: any) {
       toast.error(err.message);
-    } finally {
       setBusy(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
